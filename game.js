@@ -442,7 +442,8 @@ function iaJoue(n, b){
   if(Math.random()<0.12){
     const libres = tuilesDe(n).flatMap(voisins)
       .filter(v=>v.owner===null && v.terr!=='ocean');
-    if(libres.length && n.or>120){ const c=pick(libres); c.owner=n.id; c.pop=2; n.or-=120; }
+    if(libres.length && n.or>120){ const c=pick(libres); c.owner=n.id; c.pop=2; n.or-=120;
+      if(typeof oublierMer === 'function') oublierMer(); }
   }
   // relations qui dérivent
   for(const o of S.nations){
@@ -463,6 +464,8 @@ function iaJoue(n, b){
       .filter(v=>v.owner!==null && v.owner!==n.id && n.guerre.has(v.owner));
     if(front.length){ const c = pick(front); bataille(n, S.nations[c.owner], c, rnd(0.4,0.9)); }
   }
+  // expéditions maritimes
+  if(typeof iaMarine === 'function') iaMarine(n);
   // faire la paix
   if(n.guerre.size && Math.random()<0.05){
     const o = S.nations[[...n.guerre][0]];
@@ -489,11 +492,13 @@ function faireLaPaix(a,b){
   if(a.joueur||b.joueur) logue(`${ic('paix')} Paix entre <b>${a.nom}</b> et <b>${b.nom}</b>.`,'good');
 }
 
-function bataille(att, def, tuile, frac){
+function bataille(att, def, tuile, frac, debarquement){
   if(!def) return;
   const corps = detacher(att.armee, frac);
   const nb = nbUnites(corps);
-  if(nb<1){ if(att.joueur) logue('Aucune unité disponible pour cet assaut.','bad'); return; }
+  if(nb<1){ if(att.joueur) logue(debarquement
+      ? 'Aucune troupe embarquable : il faut des navires pour porter les hommes.'
+      : 'Aucune unité disponible pour cet assaut.','bad'); return; }
 
   const fortif = TERRAIN[tuile.terr].def + (tuile.bld==='caserne'?20:0) + tuile.fort;
   const partAir = (corps.avions||0)/nb;              // l'aviation contourne les fortifications
@@ -501,6 +506,8 @@ function bataille(att, def, tuile, frac){
 
   let fA = forceAtt(corps, att);
   if(tuile.terr==='cote' && corps.navires>0) fA *= 1.25;
+  // une tête de pont se paie : on débarque sans artillerie en position ni terrain connu
+  if(debarquement) fA *= 0.70;
   const fD = (forceDef(def.armee, def) + 25) * (1 + fortEff/100);
 
   const rA = fA*rnd(0.82,1.18), rD = fD*rnd(0.82,1.18);
@@ -520,6 +527,7 @@ function bataille(att, def, tuile, frac){
   let txt, conquise = false;
   if(tuile.occ.val >= 1){
     tuile.owner = att.id; tuile.pop *= 0.85; tuile.fort = 0; tuile.occ = null;
+    if(typeof oublierMer === 'function') oublierMer();   // les côtes ont changé de main
     txt = 'Province conquise'; conquise = true;
   } else {
     const pc = Math.round(tuile.occ.val*100);
@@ -530,7 +538,7 @@ function bataille(att, def, tuile, frac){
   if(typeof fxBataille === 'function') fxBataille(tuile, att.col, def.col, gagne, txt);
 
   if(att.joueur || def.joueur){
-    const detail = `pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`;
+    const detail = `${debarquement ? 'débarquement · ' : ''}pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`;
     if(conquise){
       logue(`${ic('paix')} <b>${att.nom}</b> achève l'occupation d'une province de <b>${def.nom}</b> · ${detail}`,
             att.joueur?'good':'bad');
@@ -676,6 +684,16 @@ function panProvince(){
   } else if(t.owner===null && [...voisins(t)].some(v=>v.owner===p.id)){
     h += `<button class="btn" data-colon="1" ${bridePause('coloniser', p.or<120)}>
       ${ic('coloniser')} Coloniser cette terre<span class="cost">120${ic('or')}</span></button>`;
+  } else if(t.owner===null && cibleNavale(p, t)){
+    const m = cibleNavale(p, t), gene = obstacleNaval(p);
+    h += `<h3 style="margin-top:14px">Outre-mer</h3>
+      <p class="muted">${m.distance} case${m.distance>1?'s':''} de mer à franchir, `
+      + `ta portée est de ${m.portee}.</p>`;
+    h += gene
+      ? `<p class="muted">${ic('verrou')} Impossible : ${gene}.</p>`
+      : `<button class="btn" data-colonmer="1" ${bridePause('coloniser', p.or<COUT_COLONIE_MER)}>
+          ${ic('coloniser')} Fonder un comptoir outre-mer
+          <span class="cost">${COUT_COLONIE_MER}${ic('or')}</span></button>`;
   } else if(n && p.guerre.has(n.id) && voisins(t).some(v=>v.owner===p.id)){
     const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
     h += `<h3 style="margin-top:14px">Offensive</h3>
@@ -685,6 +703,25 @@ function panProvince(){
     for(const pct of [25,50,100])
       h += `<button class="btn danger" data-attaque="${pct}" ${bridePause('attaquer', nbUnites(p.armee)<1)}>
         ${ic('guerre')} Engager ${pct}% des forces<span class="cost">${texteArmee(apercuDetachement(p.armee,pct/100))}</span></button>`;
+  } else if(n && p.guerre.has(n.id) && cibleNavale(p, t)){
+    const m = cibleNavale(p, t), gene = obstacleNaval(p);
+    const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
+    h += `<h3 style="margin-top:14px">Débarquement</h3>
+      <div class="row"><span>Traversée</span><span>${m.distance} case${m.distance>1?'s':''} de mer / portée ${m.portee}</span></div>
+      <div class="row"><span>Capacité de transport</span><span>${m.capacite} unité${m.capacite>1?'s':''}</span></div>
+      <div class="row"><span>Défense sur place</span><span>${(forceDef(n.armee,n)*(1+fortif/100)).toFixed(0)}</span></div>
+      <p class="muted">Une tête de pont se paie : les troupes débarquées frappent à 70% de leur force.</p>`;
+    if(gene){
+      h += `<p class="muted">${ic('verrou')} Impossible : ${gene}.</p>`;
+    } else {
+      for(const pct of [50,100]){
+        const corps = corpsDebarquement(p, pct/100);
+        h += `<button class="btn danger" data-debarque="${pct}"
+          ${bridePause('attaquer', nbUnites(corps)<1)}>
+          ${ic('navires')} Débarquer ${pct}% des forces
+          <span class="cost">${texteArmee(corps)}</span></button>`;
+      }
+    }
   }
   el.innerHTML = h;
 
@@ -703,11 +740,23 @@ function panProvince(){
     p.or-=80; t.fort+=10; majUI(); };
   if(q('[data-colon]')) q('[data-colon]').onclick = ()=>{
     if(!actionPermise('coloniser')) return refuserPause();
-    p.or-=120; t.owner=p.id; t.pop=2; logue(`${ic('coloniser')} Nouvelle province colonisée.`,'good');
+    p.or-=120; t.owner=p.id; t.pop=2; oublierMer();
+    logue(`${ic('coloniser')} Nouvelle province colonisée.`,'good');
+    majUI(); dessiner(); };
+  if(q('[data-colonmer]')) q('[data-colonmer]').onclick = ()=>{
+    if(!actionPermise('coloniser')) return refuserPause();
+    if(obstacleNaval(p) || p.or < COUT_COLONIE_MER) return;
+    p.or -= COUT_COLONIE_MER; t.owner = p.id; t.pop = 2; oublierMer();
+    logue(`${ic('navires')} Comptoir fondé outre-mer — la flotte a porté les colons.`,'good');
     majUI(); dessiner(); };
   el.querySelectorAll('[data-attaque]').forEach(btn=> btn.onclick = ()=>{
     if(!actionPermise('attaquer')) return refuserPause();
     bataille(p, S.nations[t.owner], t, btn.dataset.attaque/100);
+    dessiner(); });
+  el.querySelectorAll('[data-debarque]').forEach(btn=> btn.onclick = ()=>{
+    if(!actionPermise('attaquer')) return refuserPause();
+    if(obstacleNaval(p)) return;
+    bataille(p, S.nations[t.owner], t, fracEmbarquee(p, btn.dataset.debarque/100), true);
     dessiner(); });
 }
 
@@ -1159,9 +1208,9 @@ function majApercu(){
     l.push(`<em>Les îles seront agrandies :</em> la taille choisie ne suffirait pas à loger `
          + `${p.nations} capitales.`);
   if(CONFIG.iles > 1)
-    l.push(`<em>Les îles sont séparées par la mer.</em> On ne colonise ni n'envahit au-delà `
-         + `d'un bras de mer : tes voisins d'une autre île resteront hors d'atteinte, `
-         + `sauf par la parole.`);
+    l.push(`<em>Les îles sont séparées par la mer.</em> Pour passer de l'une à l'autre il faut `
+         + `la <b>Navigation</b> et une flotte : les navires portent les colons et les troupes. `
+         + `Jusque-là, tes voisins d'outre-mer ne sont joignables que par la parole.`);
   else
     l.push(`Une seule terre : tout le monde est voisin de tout le monde, tôt ou tard.`);
   accueilEl('accApercu').innerHTML = l.join('<br>');
@@ -1509,7 +1558,12 @@ function texteAide(){
 
   <h2>${ic('temps')} Commandes</h2>
   <div class="grille">
-    <div class="bloc"><b>Temps</b><kbd>Espace</kbd> pause/reprise · boutons <kbd>1x</kbd> <kbd>2x</kbd> <kbd>4x</kbd></div>
+    <div class="bloc"><b>Temps</b><kbd>Espace</kbd> pause/reprise · boutons <kbd>0,5x</kbd> <kbd>1x</kbd> <kbd>2x</kbd> <kbd>4x</kbd>.
+      En pause tout s'arrête : tu peux discuter et lever des troupes, rien d'autre.</div>
+    <div class="bloc"><b>${ic('navires')} La mer</b>Pour passer d'une île à l'autre il faut la
+      <b>Navigation</b>, une province côtière et des <b>navires</b> : chacun porte 3 unités.
+      La portée s'étend avec l'Industrie, l'Électricité et un port. Les troupes débarquées
+      frappent à 70% de leur force — une tête de pont se paie.</div>
     <div class="bloc"><b>Caméra</b><kbd>molette</kbd> zoom · <kbd>glisser</kbd> déplacer · <kbd>flèches</kbd>/<kbd>WASD</kbd> · <kbd>C</kbd> capitale · <kbd>F</kbd> tout voir</div>
     <div class="bloc"><b>Interface</b>Les poignées entre la carte, le panneau et le journal se glissent ; double-clic pour replier.</div>
     <div class="bloc"><b>Partie</b>Boutons de la barre : sauvegarder, charger, nouvelle partie. Sauvegarde automatique chaque 1<sup>er</sup> janvier.</div>

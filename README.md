@@ -10,8 +10,20 @@ Avant de jouer, tu choisis ton monde : le nombre d'adversaires (1 à 11), le
 nombre d'îles (1 à 8) et leur taille. La carte se dimensionne d'elle-même pour
 que tout le monde tienne — une seule île minuscule avec onze adversaires sera
 agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
-jamais : au-delà d'un bras de mer, on ne colonise ni n'envahit, on ne peut que
-parler.
+jamais : franchir un bras de mer demande une marine.
+
+## La mer
+
+Sans flotte, un archipel est une prison. Une expédition outre-mer exige trois
+choses : la technologie **Navigation**, une province côtière d'où appareiller, et
+des **navires** — chacun porte trois unités terrestres. La portée, comptée en
+cases d'océan, part de 3 et s'étend avec l'Industrie, l'Électricité et un port.
+
+On peut alors fonder un comptoir sur une île voisine (200 or, contre 120 par la
+terre) ou débarquer chez un ennemi. Une tête de pont se paie : les troupes
+débarquées frappent à 70 % de leur force, et l'expédition est plafonnée par ce
+que la flotte sait porter. L'IA prend la mer aux mêmes conditions, et le Conseil
+planifie les débarquements comme les offensives terrestres.
 
 ## Ce qui rend ce projet particulier
 
@@ -65,6 +77,7 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `render.js`, `relief.js` | rendu de la carte et du relief |
 | `ia.js` | compréhension, raisonnement, génération de parole |
 | `ia-gestion.js` | lexique et intentions du Conseil |
+| `marine.js` | portée navale, débarquements, colonisation outre-mer |
 | `negociation.js` | propositions structurées, ultimatums, crédibilité |
 | `diplomatie.js` | caractères, mémoire, décisions, répliques |
 | `conseil.js` | Conseil de la Couronne |

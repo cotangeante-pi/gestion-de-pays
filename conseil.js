@@ -238,6 +238,16 @@ function actionsPossibles(){
       pourquoi:`${TERRAIN[best.terr].nom.toLowerCase()} inoccupé${TERRAIN[best.terr].nom.endsWith('e')?'e':''}`});
   }
 
+  // --- colonisation outre-mer, quand la terre ferme est épuisée ---
+  if(typeof coloniesNavales === 'function' && !obstacleNaval(p) && p.or >= COUT_COLONIE_MER){
+    const c = coloniesNavales(p)[0];
+    if(c && !libres.length)
+      out.push({type:'colonisermer', cible:c.tuile, valeur: 2.0 + TERRAIN[c.tuile.terr].food*0.4,
+        abordable:true, cout:{or:COUT_COLONIE_MER},
+        libelle:`fonder un comptoir outre-mer sur ${nomTuile(c.tuile)}`,
+        pourquoi:`${c.distance} case${c.distance>1?'s':''} de mer, plus aucune terre libre à ta frontière`});
+  }
+
   return out.sort((a,b)=> b.valeur - a.valeur);
 }
 
@@ -266,25 +276,35 @@ function menacePrincipale(){
 function planDeGuerre(ennemi){
   const p = S.player;
   const fronts = [];
+  const mer = typeof atteignablesParMer === 'function' ? atteignablesParMer(p) : new Map();
   for(const t of S.tiles.values()){
     if(t.owner !== ennemi.id) continue;
-    if(!voisins(t).some(v => v.owner === p.id)) continue;
+    const parTerre = voisins(t).some(v => v.owner === p.id);
+    const traversee = parTerre ? 0 : mer.get(t);
+    if(!parTerre && traversee === undefined) continue;
     const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
     const def = (forceDef(ennemi.armee, ennemi) + 25) * (1 + fortif/100);
-    fronts.push({tuile:t, fortif, def});
+    // une côte lointaine coûte plus cher qu'une frontière : on la classe après
+    fronts.push({tuile:t, fortif, def, naval:!parTerre, traversee:traversee || 0,
+                 rang: def * (parTerre ? 1 : 1.45)});
   }
-  fronts.sort((a,b)=>a.def-b.def);
+  fronts.sort((a,b)=>a.rang-b.rang);
   const cible = fronts[0];
-  if(!cible) return {possible:false, ennemi};
+  if(!cible) return {possible:false, ennemi,
+    raison: mer.size ? 'aucune de ses provinces n\'est à portée' : 'ni frontière ni portée navale'};
 
-  const att = forceAtt(p.armee, p);
+  // un débarquement n'engage que ce que la flotte peut porter, et frappe à 70%
+  const att = cible.naval
+    ? forceAtt(corpsDebarquement(p, 1), p) * 0.70
+    : forceAtt(p.armee, p);
   const ratio = att / cible.def;
   const proba = clamp((ratio - 0.70) / 0.75, 0, 1);         // bornes réelles du tirage de bataille
   const manque = Math.max(0, cible.def*1.25 - att);
   const parChar = UNITES.chars.att * multMilitaire(p);
   const renforts = manque > 0 ? Math.ceil(manque / Math.max(1, parChar)) : 0;
   return {possible:true, ennemi, cible:cible.tuile, fortif:cible.fortif, def:cible.def,
-          att, ratio, proba, renforts, occ: cible.tuile.occ ? cible.tuile.occ.val : 0};
+          att, ratio, proba, renforts, naval:cible.naval, traversee:cible.traversee,
+          occ: cible.tuile.occ ? cible.tuile.occ.val : 0};
 }
 
 /* ---------- exécution réelle des ordres ---------- */
@@ -333,18 +353,32 @@ function executer(a){
       p.or -= 80; t.fort += 10;
       return {ok:true, txt:`${nomTuile(t)} fortifiée (+10% de défense, ${t.fort}% au total)`};
     }
+    case 'colonisermer': {
+      const t = a.cible;
+      const gene = obstacleNaval(p);
+      if(gene) return {ok:false, txt:gene};
+      if(!t || t.owner !== null) return {ok:false, txt:'cette terre n\'est plus libre'};
+      if(p.or < COUT_COLONIE_MER) return {ok:false, txt:`il faut ${COUT_COLONIE_MER} or`};
+      p.or -= COUT_COLONIE_MER; t.owner = p.id; t.pop = 2; oublierMer();
+      return {ok:true, txt:`comptoir fondé outre-mer sur ${nomTuile(t)} (−${COUT_COLONIE_MER} or)`};
+    }
     case 'coloniser': {
       const t = a.cible;
       if(!t || t.owner !== null) return {ok:false, txt:'cette terre n\'est plus libre'};
       if(p.or < 120) return {ok:false, txt:'il faut 120 or'};
       p.or -= 120; t.owner = p.id; t.pop = 2;
+      if(typeof oublierMer === 'function') oublierMer();
       return {ok:true, txt:`${nomTuile(t)} colonisée (−120 or)`};
     }
     case 'attaquer': {
       const t = a.cible;
       if(!t || t.owner === null || t.owner === p.id) return {ok:false, txt:'désigne une province ennemie'};
       if(!p.guerre.has(t.owner)) return {ok:false, txt:`tu n'es pas en guerre contre ${S.nations[t.owner].nom}`};
-      bataille(p, S.nations[t.owner], t, a.part || 0.5);
+      if(a.naval){
+        const gene = obstacleNaval(p);
+        if(gene) return {ok:false, txt:gene};
+        bataille(p, S.nations[t.owner], t, fracEmbarquee(p, a.part || 0.6), true);
+      } else bataille(p, S.nations[t.owner], t, a.part || 0.5);
       return {ok:true, txt:null};
     }
   }
@@ -536,16 +570,25 @@ function repComparer(an){
     `Trésor : ${Math.round(p.or)} contre ${Math.round(cible.or)} or`,
   ];
   let t = `Face à ${cible.nom} :\n${listePuces(l)}`;
-  if(!plan.possible) return t + `\nAucune frontière commune : il faudrait d'abord t'en rapprocher.`;
+  if(!plan.possible)
+    return t + `\n${plan.raison === 'ni frontière ni portée navale'
+      ? `Ni frontière commune, ni portée navale : il faudrait la Navigation et une flotte, ou te rapprocher par la terre.`
+      : `Aucune de ses provinces n'est à portée, par terre comme par mer.`}`;
+  if(plan.naval)
+    t += `\n\nAucune frontière commune — mais ${nomTuile(plan.cible)} est à `
+       + `${plan.traversee} case${plan.traversee>1?'s':''} de mer. Un débarquement est possible : `
+       + `ta flotte porte ${capaciteNavale(S.player)} unité${capaciteNavale(S.player)>1?'s':''}, `
+       + `et elles frappent à 70% de leur force.`;
   t += `\n\nMeilleur point d'attaque : ${nomTuile(plan.cible)} — défense ${Math.round(plan.def)} `
      + `(fortifications +${plan.fortif}%) contre ${Math.round(plan.att)} d'attaque, soit `
      + `environ ${Math.round(plan.proba*100)} chances sur 100 de l'emporter.`;
   if(plan.occ) t += ` Le front y est déjà occupé à ${Math.round(plan.occ*100)}%.`;
   if(plan.renforts > 0) t += ` Avec ${plan.renforts} chars de plus, tu passerais au-dessus de 60%.`;
   if(p.guerre.has(cible.id)){
-    etatConseil().proposition = {type:'attaquer', cible:plan.cible, part:0.6,
-                                 libelle:`attaquer ${nomTuile(plan.cible)} avec 60% des forces`};
-    t += ` Dis « attaque » et j'y engage 60% de l'armée.`;
+    etatConseil().proposition = {type:'attaquer', cible:plan.cible, part:0.6, naval:plan.naval,
+      libelle:`${plan.naval?'débarquer sur':'attaquer'} ${nomTuile(plan.cible)} avec 60% des forces`};
+    t += plan.naval ? ` Dis « attaque » et j'ordonne le débarquement.`
+                    : ` Dis « attaque » et j'y engage 60% de l'armée.`;
   }
   return t;
 }
@@ -980,13 +1023,18 @@ function ordreAttaquer(an){
     ennemi = g[0];
   }
   const plan = planDeGuerre(ennemi);
-  if(!plan.possible) return `Aucune province de ${ennemi.nom} ne touche tes frontières.`;
+  if(!plan.possible)
+    return `Aucune province de ${ennemi.nom} n'est à portée — ni par la terre, ni par la mer.`
+         + (obstacleNaval(S.player) ? ` Pour la mer, ${obstacleNaval(S.player)}.` : '');
   if(plan.proba < 0.25)
     return `Je le déconseille : ${Math.round(plan.proba*100)} chances sur 100 seulement sur ${nomTuile(plan.cible)}. `
          + `Il te faudrait ${plan.renforts} chars de plus. Dis « attaque quand même » si tu insistes.`;
-  const r = executer({type:'attaquer', cible:plan.cible, part:0.6});
-  return r.ok ? `Assaut lancé sur ${nomTuile(plan.cible)} avec 60% de l'armée — vois le journal pour le rapport.`
-              : `Impossible : ${r.txt}.`;
+  const r = executer({type:'attaquer', cible:plan.cible, part:0.6, naval:plan.naval});
+  return r.ok
+    ? `${plan.naval ? `Débarquement lancé sur ${nomTuile(plan.cible)} — la flotte a porté `
+        + `${nbUnites(corpsDebarquement(S.player, 0.6))} unités.`
+      : `Assaut lancé sur ${nomTuile(plan.cible)} avec 60% de l'armée.`} Vois le journal pour le rapport.`
+    : `Impossible : ${r.txt}.`;
 }
 
 /* ---------- point d'entrée ---------- */
@@ -1135,7 +1183,7 @@ function repondreConseil(txt){
   if(/\battaque quand meme\b/.test(brut)){
     const g = [...p.guerre].map(i=>S.nations[i]).filter(o=>tuilesDe(o).length)[0];
     if(g){ const plan = planDeGuerre(g);
-      if(plan.possible){ executer({type:'attaquer', cible:plan.cible, part:0.6});
+      if(plan.possible){ executer({type:'attaquer', cible:plan.cible, part:0.6, naval:plan.naval});
         return `Comme tu voudras. Assaut lancé sur ${nomTuile(plan.cible)}.`; } }
   }
 

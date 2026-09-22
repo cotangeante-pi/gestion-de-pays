@@ -299,6 +299,9 @@ function cascadeConseil(base, slots, G){
 
   // --- 2. familles de questions restantes ---
   else if(G('classer') > .5)               { acte='G_CLASSER';    regle='superlatif'; }
+  // une nation nommée + une idée de force : c'est une comparaison, pas un catalogue
+  else if(slots.cible && (G('comparer') > .3 || G('guerre') > .3 || G('force') > .4))
+                                           { acte='G_COMPARER';   regle='comparaison avec une nation nommée'; }
   else if(G('diplo') > .6 && G('comparer') < .5) { acte='G_DIPLO_ETAT'; regle='état des relations'; }
   else if(G('liste') > .5 && G('diplo') < .6) { acte='G_LISTE';   regle='demande de catalogue'; }
   else if(G('diplo') > .6)                 { acte='G_DIPLO_ETAT'; regle='état des relations'; }
