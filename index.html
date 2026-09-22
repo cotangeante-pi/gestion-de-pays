@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nation — Gestion de pays</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="topbar">
+  <div class="brand">🌍 NATION</div>
+  <div class="res" id="resBar"></div>
+  <div class="outils">
+    <button id="btnSave" class="spd" title="Sauvegarder la partie"></button>
+    <button id="btnLoad" class="spd" title="Charger la dernière sauvegarde"></button>
+    <button id="btnNew" class="spd" title="Nouvelle partie"></button>
+    <button id="btnAide" class="spd aide" title="Règles du jeu (H)">?</button>
+  </div>
+  <div class="timectl">
+    <span id="dateLabel">Jan 1900</span>
+    <button id="btnFit" class="spd" title="Voir tout le monde (F)"></button>
+    <button id="btnCenter" class="spd" title="Recentrer sur ta capitale (C)"></button>
+    <button id="btnPause" class="spd" title="Pause / reprise (Espace)"></button>
+    <button class="spd" data-speed="0.5">0,5x</button>
+    <button class="spd" data-speed="1">1x</button>
+    <button class="spd" data-speed="2">2x</button>
+    <button class="spd" data-speed="4">4x</button>
+  </div>
+</div>
+
+<div id="main">
+  <canvas id="map"></canvas>
+  <div id="mini">
+    <div class="minitete"><span>Monde</span><button id="miniToggle" title="Masquer (M)">−</button></div>
+    <canvas id="minicv" width="230" height="170"></canvas>
+  </div>
+  <div id="hsplit" class="split" title="Glisse pour redimensionner · double-clic pour replier"></div>
+
+  <div id="side">
+    <div class="tabs">
+      <button class="tab active" data-tab="province">🗺️<br>Province</button>
+      <button class="tab" data-tab="pays">🏛️<br>Pays</button>
+      <button class="tab" data-tab="tech">🔬<br>Recherche</button>
+      <button class="tab" data-tab="diplo">🤝<br>Diplomatie</button>
+      <button class="tab" data-tab="armee">⚔️<br>Armée</button>
+      <button class="tab" data-tab="chat" id="tabChat">💬<br>Messages</button>
+    </div>
+    <div class="panel" id="tab-province"></div>
+    <div class="panel hidden" id="tab-pays"></div>
+    <div class="panel hidden" id="tab-tech"></div>
+    <div class="panel hidden" id="tab-diplo"></div>
+    <div class="panel hidden" id="tab-armee"></div>
+    <div class="panel hidden" id="tab-chat"></div>
+  </div>
+</div>
+
+<div id="vsplit" class="split" title="Glisse pour redimensionner · double-clic pour replier"></div>
+<div id="log"></div>
+
+<div id="tip" class="hidden"></div>
+
+<div id="aide" class="hidden">
+  <div class="aidebox">
+    <button id="aideFermer" class="aideX" title="Fermer (Échap)">×</button>
+    <div id="aideTexte"></div>
+  </div>
+</div>
+
+<div id="chargement"><div class="spin"></div><p>Sculpture du relief…</p></div>
+<div id="modal" class="hidden"><div class="modalbox"><h2 id="modalTitle"></h2><p id="modalBody"></p><button id="modalOk">OK</button></div></div>
+
+<script src="icons.js"></script>
+<script src="diplomatie.js"></script>
+<script src="ia.js"></script>
+<script src="ia-gestion.js"></script>
+<script src="negociation.js"></script>
+<script src="conseil.js"></script>
+<script src="relief.js"></script>
+<script src="render.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
