@@ -6,6 +6,13 @@ ouvre `index.html` dans un navigateur et joue.
 Tu commences avec ta seule capitale. Tout le reste — provinces, bâtiments,
 technologies, alliances — se colonise, se construit ou se négocie.
 
+Avant de jouer, tu choisis ton monde : le nombre d'adversaires (1 à 11), le
+nombre d'îles (1 à 8) et leur taille. La carte se dimensionne d'elle-même pour
+que tout le monde tienne — une seule île minuscule avec onze adversaires sera
+agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
+jamais : au-delà d'un bras de mer, on ne colonise ni n'envahit, on ne peut que
+parler.
+
 ## Ce qui rend ce projet particulier
 
 L'IA ne s'appuie sur aucun modèle de langage : tout est calculé en local.
@@ -46,8 +53,9 @@ autrement.
 `Espace` pause · `molette` zoom · `flèches` / `WASD` déplacer ·
 `C` capitale · `F` vue d'ensemble · `H` règles
 
-En pause, le temps est arrêté pour tout le monde : tu peux discuter et lever des
-troupes, mais rien qui change la carte.
+Quatre vitesses (0,5× à 4×). En pause, le temps est arrêté pour tout le monde :
+tu peux discuter et lever des troupes, mais rien qui change la carte — ni par
+l'interface, ni en donnant l'ordre au Conseil.
 
 ## Fichiers
 

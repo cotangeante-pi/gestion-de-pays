@@ -89,27 +89,79 @@ const fmt = n=>{n=Math.round(n); return Math.abs(n)>=1000?(n/1000).toFixed(1)+'k
 
 // ---------- Génération du monde ----------
 
-const RAYON = 13;
+/* ===========================================================
+   RÉGLAGES DU MONDE — choisis avant la partie.
+   Le rayon de la carte n'est pas un réglage : il se déduit de
+   la surface de terre demandée, pour qu'un archipel de huit
+   grandes îles ne soit pas à l'étroit et qu'une île unique ne
+   flotte pas au milieu d'un océan vide.
+   =========================================================== */
 
-function genererMonde(){
+const TAILLES = [
+  {cle:'minuscules', nom:'minuscules', mult:0.40},
+  {cle:'petites',    nom:'petites',    mult:0.65},
+  {cle:'moyennes',   nom:'moyennes',   mult:1.00},
+  {cle:'grandes',    nom:'grandes',    mult:1.55},
+  {cle:'vastes',     nom:'vastes',     mult:2.30},
+];
+const MAX_ADVERSAIRES = 11;                 // 12 noms et 12 couleurs disponibles
+
+const CONFIG = {adversaires:6, iles:6, taille:2};
+
+// surface de terre visée, et rayon de carte qui va avec
+function planMonde(cfg = CONFIG){
+  const mult = TAILLES[clamp(cfg.taille,0,TAILLES.length-1)].mult;
+  const nations = cfg.adversaires + 1;
+  const parIle = Math.round(30 * mult);
+  // assez de terre pour les îles demandées, et au moins de quoi loger tout le monde :
+  // 11 adversaires sur une seule île minuscule, ce sont douze capitales sur vingt cases
+  const voulu = cfg.iles * parIle;
+  const requis = nations * 15;
+  const terre = Math.max(voulu, requis);
+  const agrandi = requis > voulu;                 // la taille choisie a dû être forcée
+  const cibleIle = Math.max(5, Math.round(terre / cfg.iles));
+  // la terre occupe ~40% du disque utile ; le pourtour reste en pleine mer
+  const utile = terre / 0.40;
+  const u = Math.sqrt(Math.max(1, utile / 3));
+  const rayon = Math.round(clamp(u + 2.5, 9, 30));
+  return {mult, nations, parIle, terre, rayon, cibleIle, agrandi};
+}
+
+function genererMonde(cfg = CONFIG){
+  const plan = planMonde(cfg);
+  const RAYON = plan.rayon;
+  S.plan = plan;
+
   // 1. disque d'hexagones
   for(let q=-RAYON;q<=RAYON;q++){
     for(let r=Math.max(-RAYON,-q-RAYON); r<=Math.min(RAYON,-q+RAYON); r++){
       S.tiles.set(key(q,r),{q,r,terr:'ocean',owner:null,pop:0,bld:null,fort:0,occ:null,geo:null});
     }
   }
-  // 2. continents : quelques noyaux qui poussent
-  const noyaux = 6 + ri(0,2);
+  // 2. îles : autant de noyaux que demandé, chacun poussant à la taille voulue
+  const noyaux = clamp(cfg.iles, 1, 12);
   for(let i=0;i<noyaux;i++){
-    const ang = Math.random()*Math.PI*2, d = rnd(0,RAYON*0.72);
+    // couronne régulière : c'est l'espacement qui fait l'archipel. Le rayon de
+    // l'île attendue donne la distance minimale à tenir entre deux noyaux.
+    const rIle = Math.sqrt(Math.max(1, plan.cibleIle) / 3);   // rayon approché d'une île
+    const ecart = noyaux > 1 ? (rIle * 2.1) / (2 * Math.sin(Math.PI / noyaux)) : 0;
+    const rCouronne = clamp(ecart, RAYON*0.34, RAYON*0.70);
+    const ang = (i / noyaux) * Math.PI*2 + rnd(-0.18, 0.18);
+    const d = noyaux === 1 ? rnd(0, RAYON*0.15) : rCouronne * rnd(0.92, 1.08);
     let q = Math.round(Math.cos(ang)*d), r = Math.round(Math.sin(ang)*d);
     let t = T(q,r); if(!t) continue;
-    let front=[t], taille = ri(18,42);
-    t.terr='plaine';
-    while(front.length && taille-->0){
+    const cible = Math.max(4, Math.round(plan.cibleIle * rnd(0.80, 1.20)));
+    let front=[t], pose = 1;
+    t.terr='plaine'; t.ile = i;
+    while(front.length && pose < cible){
       const cur = front.splice(ri(0,front.length-1),1)[0];
       for(const v of voisins(cur)){
-        if(v.terr==='ocean' && Math.random()<0.55){ v.terr='plaine'; front.push(v); }
+        if(v.terr!=='ocean' || Math.random()>=0.62) continue;
+        // on laisse toujours un bras de mer : deux îles ne se soudent pas,
+        // sans quoi « huit îles » finirait en un seul continent
+        if(voisins(v).some(w => w.terr!=='ocean' && w.ile !== undefined && w.ile !== i)) continue;
+        v.terr='plaine'; v.ile = i; front.push(v);
+        if(++pose >= cible) break;
       }
     }
   }
@@ -127,32 +179,57 @@ function genererMonde(){
     const d = (Math.abs(t.q) + Math.abs(t.q+t.r) + Math.abs(t.r))/2;
     if(d > RAYON - 2.5) t.terr = 'ocean';
   }
+  // la ceinture d'océan a pu ronger les côtes : on vérifie qu'il reste assez de terre
+  const minimum = (clamp(cfg.adversaires, 0, MAX_ADVERSAIRES) + 1) * 10;
+  let garde = 0;
+  while([...S.tiles.values()].filter(t=>t.terr!=='ocean').length < minimum && garde++ < 40){
+    const bord = [...S.tiles.values()].filter(t =>
+      t.terr === 'ocean' && voisins(t).some(v=>v.terr!=='ocean') &&
+      (Math.abs(t.q)+Math.abs(t.q+t.r)+Math.abs(t.r))/2 <= RAYON - 3);
+    if(!bord.length) break;
+    for(const t of bord){
+      if(Math.random()>=0.5) continue;
+      const iles = new Set(voisins(t).filter(v=>v.terr!=='ocean' && v.ile!==undefined).map(v=>v.ile));
+      if(iles.size > 1) continue;                  // ne pas relier deux îles entre elles
+      t.terr='plaine'; if(iles.size === 1) t.ile = [...iles][0];
+    }
+  }
+
   for(const t of S.tiles.values()){
     if(t.terr!=='ocean' && t.terr!=='montagne' && voisins(t).some(v=>v.terr==='ocean')
        && Math.random()<0.7) t.terr='cote';
   }
 
   // 4. nations : le joueur + IA
-  const terres = [...S.tiles.values()].filter(t=>t.terr!=='ocean');
-  const nbIA = 6;
+  const nbIA = clamp(cfg.adversaires, 0, MAX_ADVERSAIRES);
   const noms = [...NOMS_IA].sort(()=>Math.random()-0.5);
   noms[0] = pick(['Avalonie','Ostrévie','Novaterre','Lysandre','Ferrance','Montclair']);
   const capitales = [];
 
+  // on n'installe personne sur un îlot de trois cases : on repère les masses
+  // de terre viables, et on répartit les capitales entre elles
+  const masses = massesDeTerre();
+  const viables = masses.filter(m => m.length >= 6).sort((a,b)=>b.length-a.length);
+  const accueil = viables.length ? viables : masses.sort((a,b)=>b.length-a.length);
+  const libres = accueil.length ? accueil.flat() : [...S.tiles.values()].filter(t=>t.terr!=='ocean');
+
   for(let i=0;i<=nbIA;i++){
-    // capitale : loin des autres capitales
+    // capitale : sur une masse viable, et aussi loin que possible des autres
+    const bassin = accueil.length ? accueil[i % accueil.length] : libres;
     let best=null, bestD=-1;
     for(let k=0;k<260;k++){
-      const c = pick(terres);
-      if(c.owner!==null) continue;
-      const d = capitales.length? Math.min(...capitales.map(p=>hexDist(p,c))) : 99;
+      const c = pick(bassin.length ? bassin : libres);
+      if(!c || c.owner!==null) continue;
+      const d = capitales.length ? Math.min(...capitales.map(x=>hexDist(x,c))) : 99;
       if(d>bestD){bestD=d;best=c;}
     }
+    // dernier recours : n'importe quelle terre encore libre
+    if(!best) best = libres.find(t=>t.owner===null);
     if(!best) break;
     capitales.push(best);
 
     const n = {
-      id:i, nom: noms[i] || ('Nation '+i), col: i===0?'#4da3ff':COULEURS[i-1],
+      id:i, nom: noms[i] || ('Nation '+i), col: i===0?'#4da3ff':(COULEURS[i-1]||'#888'),
       joueur:i===0, or:400, mat:150, nourriture:120, bonheur:65,
       armee: Object.assign(armeeVide(), {infanterie: i===0?2:ri(1,3)}),
       taxe:0.35, sci:0, tech:new Set(['ecriture']), rech:null,
@@ -172,6 +249,22 @@ function genererMonde(){
   for(const a of S.nations) for(const b of S.nations)
     if(a!==b) a.rel[b.id] = ri(-10,25);
 
+}
+
+/* --- les masses de terre connexes : une « île » au sens du jeu --- */
+function massesDeTerre(){
+  const vus = new Set(), out = [];
+  for(const t of S.tiles.values()){
+    if(t.terr === 'ocean' || vus.has(t)) continue;
+    const masse = [], file = [t]; vus.add(t);
+    while(file.length){
+      const c = file.pop(); masse.push(c);
+      for(const v of voisins(c))
+        if(v && v.terr !== 'ocean' && !vus.has(v)){ vus.add(v); file.push(v); }
+    }
+    out.push(masse);
+  }
+  return out;
 }
 
 function hexDist(a,b){
@@ -1037,14 +1130,68 @@ function demarrer(donnees){
   majUI();
 }
 
+/* ===========================================================
+   ÉCRAN DE DÉPART — on choisit son monde avant d'y régner
+   =========================================================== */
+
+const accueilEl = id => document.getElementById(id);
+
+// une valeur illisible ne doit pas produire un NaN qui traverserait la génération
+const nombreSur = (v, defaut) => Number.isFinite(+v) ? +v : defaut;
+
+function lireReglages(){
+  CONFIG.adversaires = clamp(nombreSur(accueilEl('sAdv').value,    6), 1, MAX_ADVERSAIRES);
+  CONFIG.iles        = clamp(nombreSur(accueilEl('sIles').value,   6), 1, 8);
+  CONFIG.taille      = Math.round(clamp(nombreSur(accueilEl('sTaille').value, 2), 0, TAILLES.length-1));
+}
+
+function majApercu(){
+  lireReglages();
+  const p = planMonde(CONFIG);
+  const cases = 3*p.rayon*p.rayon + 3*p.rayon + 1;
+  accueilEl('vAdv').textContent    = CONFIG.adversaires;
+  accueilEl('vIles').textContent   = CONFIG.iles;
+  accueilEl('vTaille').textContent = TAILLES[CONFIG.taille].nom;
+
+  const l = [`Un monde d'environ <b>${cases}</b> cases, dont à peu près `
+           + `<b>${p.terre}</b> de terre ferme, pour <b>${p.nations}</b> nations.`];
+  if(p.agrandi)
+    l.push(`<em>Les îles seront agrandies :</em> la taille choisie ne suffirait pas à loger `
+         + `${p.nations} capitales.`);
+  if(CONFIG.iles > 1)
+    l.push(`<em>Les îles sont séparées par la mer.</em> On ne colonise ni n'envahit au-delà `
+         + `d'un bras de mer : tes voisins d'une autre île resteront hors d'atteinte, `
+         + `sauf par la parole.`);
+  else
+    l.push(`Une seule terre : tout le monde est voisin de tout le monde, tôt ou tard.`);
+  accueilEl('accApercu').innerHTML = l.join('<br>');
+}
+
+function ouvrirAccueil(){
+  accueilEl('accueil').classList.remove('hidden');
+  S.paused = true; majVitesse();
+  accueilEl('accCharger').classList.toggle('hidden', !localStorage.getItem(CLE_SAUV));
+  majApercu();
+}
+function fermerAccueil(){ accueilEl('accueil').classList.add('hidden'); }
+
+['sAdv','sIles','sTaille'].forEach(id => accueilEl(id).oninput = majApercu);
+// les touches du jeu ne doivent pas agir pendant qu'on règle les curseurs
+accueilEl('accueil').addEventListener('keydown', e => e.stopPropagation());
+
+accueilEl('accJouer').onclick = ()=>{
+  lireReglages();
+  fermerAccueil();
+  nouvellePartie();
+};
+accueilEl('accCharger').onclick = ()=>{ fermerAccueil(); charger(); };
+
 window.addEventListener('load', ()=>{
   setTimeout(()=>{
     demarrer();
-    document.getElementById('chargement').classList.add('hidden');
-    logue(`${ic('monde')} <b>${dateTexte()}</b> — Ton pays est né. <kbd>Espace</kbd> pause · <kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · <kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
-    if(localStorage.getItem(CLE_SAUV))
-      logue('Une sauvegarde existe : clique sur le bouton « charger » de la barre du haut pour la reprendre.');
+    accueilEl('chargement').classList.add('hidden');
     requestAnimationFrame(boucle);
+    ouvrirAccueil();
   }, 60);
 });
 
@@ -1246,7 +1393,11 @@ function nouvellePartie(){
     S.conseil = null;           // ni la conversation du Conseil, ni son contexte
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
-    logue(`${ic('monde')} Nouveau monde, nouveau pays. Bonne chance !`,'good');
+    logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`
+        + `${CONFIG.adversaires>1?'s':''}, ${CONFIG.iles} île${CONFIG.iles>1?'s':''} `
+        + `${TAILLES[CONFIG.taille].nom}. Ton pays est né. <kbd>Espace</kbd> pause · `
+        + `<kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · `
+        + `<kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
   }, 60);
 }
 
@@ -1377,14 +1528,7 @@ document.getElementById('aideFermer').onclick = fermerAide;
 document.getElementById('aide').onclick = e => { if(e.target.id === 'aide') fermerAide(); };
 document.getElementById('btnSave').onclick = ()=> sauvegarder(false);
 document.getElementById('btnLoad').onclick = charger;
-document.getElementById('btnNew').onclick  = ()=>{
-  modal('Nouvelle partie', 'La partie en cours sera perdue si elle n\'est pas sauvegardée.');
-  document.getElementById('modalOk').onclick = ()=>{
-    document.getElementById('modal').classList.add('hidden');
-    document.getElementById('modalOk').onclick = ()=> document.getElementById('modal').classList.add('hidden');
-    nouvellePartie();
-  };
-};
+document.getElementById('btnNew').onclick  = ()=> ouvrirAccueil();
 document.getElementById('btnFit').onclick = ()=> toutVoir();
 document.getElementById('btnSave').innerHTML = ic('pacte');
 document.getElementById('btnLoad').innerHTML = ic('coloniser');

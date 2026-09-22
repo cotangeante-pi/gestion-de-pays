@@ -67,6 +67,28 @@
   </div>
 </div>
 
+<div id="accueil" class="hidden">
+  <div class="accbox">
+    <h1>Nation</h1>
+    <p class="accsous">Choisis le monde dans lequel tu veux régner.</p>
+
+    <label class="accchamp"><span>Adversaires</span><b id="vAdv">6</b>
+      <input class="slider" type="range" id="sAdv" min="1" max="11" value="6"></label>
+
+    <label class="accchamp"><span>Nombre d'îles</span><b id="vIles">6</b>
+      <input class="slider" type="range" id="sIles" min="1" max="8" value="6"></label>
+
+    <label class="accchamp"><span>Taille des îles</span><b id="vTaille">moyennes</b>
+      <input class="slider" type="range" id="sTaille" min="0" max="4" value="2"></label>
+
+    <p class="accapercu" id="accApercu"></p>
+    <div class="accboutons">
+      <button class="btn" id="accJouer">Commencer la partie</button>
+      <button class="btn" id="accCharger">Reprendre la sauvegarde</button>
+    </div>
+  </div>
+</div>
+
 <div id="chargement"><div class="spin"></div><p>Sculpture du relief…</p></div>
 <div id="modal" class="hidden"><div class="modalbox"><h2 id="modalTitle"></h2><p id="modalBody"></p><button id="modalOk">OK</button></div></div>
 
