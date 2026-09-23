@@ -153,7 +153,7 @@ function valeurPatrimoine(n){
     const T0 = TERRAIN[t.terr];
     v += (T0.food*2.2 + T0.mat*1.6) * 40              // production capitalisée
        + t.pop * 18                                    // les hommes valent plus que la terre
-       + (t.bld ? BUILDINGS[t.bld].or : 0);
+       + batiments(t).reduce((a,k)=>a+BUILDINGS[k].or, 0);
   }
   for(const k of CLES_UNITES) v += (n.armee[k]||0) * UNITES[k].or;
   return v;
@@ -328,7 +328,7 @@ function evaluerCessionTerre(n, orOffert){
   // il céderait la moins utile, de préférence une qui touche déjà tes terres
   const note = t => {
     const T0 = TERRAIN[t.terr];
-    const prod = T0.food*1.1 + T0.mat*0.8 + t.pop*0.9 + (t.bld ? 6 : 0) + t.fort*0.12;
+    const prod = T0.food*1.1 + T0.mat*0.8 + t.pop*0.9 + nbBatiments(t)*6 + t.fort*0.12;
     const touche = voisins(t).some(v => v && v.owner === p.id) ? -2.5 : 0;   // plus facile à lâcher
     const capitale = (n.capitale === t) ? 999 : 0;                           // jamais la capitale
     return prod + touche + capitale;
@@ -339,7 +339,8 @@ function evaluerCessionTerre(n, orOffert){
 
   // valeur en or : production capitalisée sur ~4 ans, majorée de l'attachement
   const T0 = TERRAIN[tuile.terr];
-  const rente = T0.food*2.2 + T0.mat*1.6 + tuile.pop*1.8 + (tuile.bld ? BUILDINGS[tuile.bld].or*0.5 : 0);
+  const rente = T0.food*2.2 + T0.mat*1.6 + tuile.pop*1.8
+              + batiments(tuile).reduce((a,k)=>a+BUILDINGS[k].or*0.5, 0);
   const attache = 1.6 + k.rancune*0.9 + (1 - k.cupidite)*0.8;
   const prix = Math.max(150, Math.round(rente * 48 * attache / 50) * 50);
 

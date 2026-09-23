@@ -62,7 +62,7 @@ function diagnostic(sujet){
     let terres = 0, fermes = 0;
     for(const t of tuilesDe(p)){
       terres += TERRAIN[t.terr].food + t.pop*0.05;
-      if(t.bld === 'ferme') fermes += 5 * (aTech(p,'agronomie')?1.5:1);
+      fermes += effetsProvince(t, p).food - TERRAIN[t.terr].food - t.pop*0.05;
     }
     lignes.push({quoi:'terres', v:terres, txt:'rendement naturel des provinces'});
     if(fermes) lignes.push({quoi:'fermes', v:fermes, txt:`fermes${aTech(p,'agronomie')?' (+50% agronomie)':''}`});
@@ -73,8 +73,8 @@ function diagnostic(sujet){
   if(sujet === 'energie'){
     let prod = 0, conso = 0;
     for(const t of tuilesDe(p)){
-      if(t.bld === 'centrale') prod += 10 + (aTech(p,'electricite')?6:0);
-      if(t.bld === 'usine') conso += 3;
+      const e = effetsProvince(t, p);
+      if(e.energie > 0) prod += e.energie; else conso -= e.energie;
     }
     lignes.push({quoi:'centrales', v:prod, txt:'centrales'});
     lignes.push({quoi:'usines', v:-conso, txt:'usines'});
@@ -126,7 +126,7 @@ function projeterEtat(mois = 12){
 function meilleurEmplacement(type){
   const p = S.player, B = BUILDINGS[type], out = [];
   for(const t of tuilesDe(p)){
-    if(t.bld) continue;
+    if(!placeLibre(t)) continue;
     if(B.cote && t.terr !== 'cote') continue;
     let score = 0, raisons = [];
     const T0 = TERRAIN[t.terr];
@@ -153,6 +153,13 @@ function meilleurEmplacement(type){
     // sécurité : on évite de bâtir sous le nez d'un ennemi
     const danger = voisins(t).filter(v => v.owner !== null && v.owner !== p.id && p.guerre.has(v.owner)).length;
     if(danger && type !== 'caserne'){ score -= danger*3; raisons.push('mais exposée à l\'ennemi'); }
+    // regrouper le même ouvrage au même endroit paie : c'est la spécialisation
+    const deja = batiments(t).filter(k => k === type).length;
+    if(deja){
+      const apres = (deja + 1) / (nbBatiments(t) + 1);
+      score += 3 + apres*4;
+      raisons.push(`déjà ${deja} ${BUILDINGS[type].nom.toLowerCase()}${deja>1?'s':''} sur place — la province s'y spécialise`);
+    }
     out.push({tuile:t, score, raisons});
   }
   return out.sort((a,b)=>b.score-a.score)[0] || null;
@@ -282,7 +289,7 @@ function planDeGuerre(ennemi){
     const parTerre = voisins(t).some(v => v.owner === p.id);
     const traversee = parTerre ? 0 : mer.get(t);
     if(!parTerre && traversee === undefined) continue;
-    const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
+    const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
     const def = (forceDef(ennemi.armee, ennemi) + 25) * (1 + fortif/100);
     // une côte lointaine coûte plus cher qu'une frontière : on la classe après
     fronts.push({tuile:t, fortif, def, naval:!parTerre, traversee:traversee || 0,
@@ -318,12 +325,14 @@ function executer(a){
   switch(a.type){
     case 'batir': {
       const B = BUILDINGS[a.cle], t = a.cible;
-      if(!t || t.bld) return {ok:false, txt:'cette province est déjà bâtie'};
+      if(!t) return {ok:false, txt:'désigne une province'};
+      if(!placeLibre(t)) return {ok:false, txt:`${nomTuile(t)} porte déjà ${nbBatiments(t)} ouvrages, `
+        + `c'est tout ce que sa population supporte`};
       if(B.tech && !aTech(p, B.tech)) return {ok:false, txt:`il faut d'abord la technologie « ${TECHS[B.tech].nom} »`};
       if(B.cote && t.terr !== 'cote') return {ok:false, txt:'un port exige une province côtière'};
       if(p.or < B.or || p.mat < B.mat)
         return {ok:false, txt:`il manque ${Math.max(0, Math.ceil(B.or-p.or))} or et ${Math.max(0, Math.ceil(B.mat-p.mat))} matériaux`};
-      p.or -= B.or; p.mat -= B.mat; t.bld = a.cle;
+      p.or -= B.or; p.mat -= B.mat; ajouterBatiment(t, a.cle);
       return {ok:true, txt:`${B.nom} bâtie sur ${nomTuile(t)} (−${B.or} or, −${B.mat} matériaux)`};
     }
     case 'recruter': {
@@ -656,7 +665,7 @@ function repRegles(an){
     return `${B.nom} — ${B.desc}. Coût ${B.or} or et ${B.mat} matériaux, entretien ${B.up} or par mois`
       + (B.tech ? `, exige la technologie « ${TECHS[B.tech].nom} »` : ``)
       + (B.cote ? `, et une province côtière` : ``) + `. `
-      + (place ? `Tu en as ${tuilesDe(p).filter(t=>t.bld===s.batiment).length} ; la prochaine irait sur ${nomTuile(place.tuile)}.`
+      + (place ? `Tu en as ${tuilesDe(p).reduce((a,t)=>a+batiments(t).filter(x=>x===s.batiment).length,0)} ; la prochaine irait sur ${nomTuile(place.tuile)}.`
                : `Aucune province libre ne peut l'accueillir pour l'instant.`); }
   if(s.unite){ const U = UNITES[s.unite];
     return `${U.nom} — ${U.desc} Attaque ${U.att}, défense ${U.def}, ${U.hommes.toLocaleString('fr-FR')} hommes par unité. `
@@ -691,8 +700,9 @@ function repInventaire(an){
     + `soit ${((p.armee[s.unite]||0)*UNITES[s.unite].hommes).toLocaleString('fr-FR')} hommes `
     + `et ${((p.armee[s.unite]||0)*UNITES[s.unite].up).toFixed(1)} or de solde par mois.`;
   if(s.batiment){
-    const l = tuilesDe(p).filter(t => t.bld === s.batiment);
-    return l.length ? `${BUILDINGS[s.batiment].nom} : ${l.length} — ${l.map(nomTuile).join(', ')}.`
+    const l = tuilesDe(p).filter(t => aBatiment(t, s.batiment));
+    const total = tuilesDe(p).reduce((a,t)=>a+batiments(t).filter(x=>x===s.batiment).length,0);
+    return l.length ? `${BUILDINGS[s.batiment].nom} : ${total} sur ${l.length} province(s) — ${l.map(nomTuile).join(', ')}.`
                     : `Tu n'as aucune ${BUILDINGS[s.batiment].nom.toLowerCase()}.`;
   }
   return listeInventaire(tableauRessources());
@@ -724,7 +734,7 @@ function repRessource(an, cle){
 function listeInventaire(R){
   const p = S.player, b = bilan(p);
   const bats = {};
-  for(const t of tuilesDe(p)) if(t.bld) bats[t.bld] = (bats[t.bld]||0)+1;
+  for(const t of tuilesDe(p)) for(const k of batiments(t)) bats[k] = (bats[k]||0)+1;
   return `Inventaire du royaume :\n` + listePuces([
     R.or(), R.materiaux(), R.nourriture(),
     `${b.energie.toFixed(0)} d'énergie · ${Math.round(p.sci)} points de recherche`,
@@ -805,12 +815,12 @@ function repClasser(an){
   }
 
   const mesures = {
-    riche:      t => (BUILDINGS[t.bld]?.eff.gold || 0) + t.pop*p.taxe*0.55,
+    riche:      t => effetsProvince(t, p).gold + t.pop*p.taxe*0.55,
     peuplee:    t => t.pop,
-    nourriciere:t => TERRAIN[t.terr].food + t.pop*0.05 + (t.bld==='ferme'?5:0),
+    nourriciere:t => effetsProvince(t, p).food + TERRAIN[t.terr].food + t.pop*0.05,
     exposee:    t => voisins(t).filter(x=>x.owner!==null&&x.owner!==p.id&&p.guerre.has(x.owner)).length*10
                    + voisins(t).filter(x=>x.owner!==null&&x.owner!==p.id).length*3 - t.fort*0.2 - TERRAIN[t.terr].def*0.1,
-    fortifiee:  t => t.fort + TERRAIN[t.terr].def + (t.bld==='caserne'?20:0),
+    fortifiee:  t => t.fort + TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0),
     puissante:  t => t.pop + t.fort,
   };
   const f = mesures[dim] || mesures.riche;
@@ -818,7 +828,9 @@ function repClasser(an){
   if(!l.length) return `Tu ne possèdes aucune province.`;
   etatConseil().contexte.province = l[0].t;
   const nomDim = DIMENSIONS[dim] ? DIMENSIONS[dim].nom : dim;
-  const det = t => `${nomTuile(t)} — ${t.pop.toFixed(1)}k hab., ${t.bld?BUILDINGS[t.bld].nom.toLowerCase():'sans bâtiment'}`
+  const det = t => `${nomTuile(t)} — ${t.pop.toFixed(1)}k hab., `
+                 + (nbBatiments(t) ? batiments(t).map(k=>BUILDINGS[k].nom.toLowerCase()).join(' + ')
+                                   : 'sans ouvrage')
                  + (t.fort?`, ${t.fort}% de fortifications`:'');
   return `Ta province la ${inv?'moins':'plus'} ${nomDim} est ${nomTuile(l[0].t)}.\n`
        + listePuces(l.slice(0,4).map((x,i)=>`${i+1}. ${det(x.t)}`))
@@ -906,12 +918,17 @@ function repProvince(an){
   if(t.owner !== p.id) return `${nomTuile(t)} ne t'appartient pas : elle est à ${t.owner===null?'personne':S.nations[t.owner].nom}.`;
   C.contexte.province = t;
 
-  const T0 = TERRAIN[t.terr], B = t.bld && BUILDINGS[t.bld];
+  const T0 = TERRAIN[t.terr];
   const l = [
     `Terrain : ${T0.nom.toLowerCase()} — ${T0.food} de nourriture, ${T0.mat} de matériaux, +${T0.def}% de défense naturelle`,
     `Population : ${t.pop.toFixed(1)}k habitants`,
-    B ? `Bâtiment : ${B.nom} (${B.desc}, entretien ${B.up}/mois)` : `Aucun bâtiment`,
-    `Fortifications : ${t.fort}%${t.bld==='caserne'?' + 20% de caserne':''}`,
+    nbBatiments(t) ? `Ouvrages (${nbBatiments(t)}/${capaciteBat(t)}) : `
+        + batiments(t).map(k=>BUILDINGS[k].nom).join(', ')
+        + (specialite(t).nb > 1 ? ` — dédiée ${Math.round(specialite(t).part*100)}% `
+          + `à la ${BUILDINGS[specialite(t).cle].nom.toLowerCase()}, rendement ×`
+          + multSpecialite(t, specialite(t).cle).toFixed(2) : '')
+      : `Aucun ouvrage (${capaciteBat(t)} possibles)`,
+    `Fortifications : ${t.fort}%${aBatiment(t,'caserne')?' + 20% de caserne':''}`,
   ];
   const vois = voisins(t).filter(x=>x.owner!==null&&x.owner!==p.id).map(x=>S.nations[x.owner]);
   const etr = [...new Set(vois)];
@@ -921,7 +938,7 @@ function repProvince(an){
   if(t.occ) l.push(`OCCUPÉE à ${Math.round(t.occ.val*100)}% par ${S.nations[t.occ.par].nom} — elle ne produit presque plus`);
 
   let txt = `${majuscule(nomTuile(t))} :\n${listePuces(l)}`;
-  if(!t.bld){
+  if(placeLibre(t)){
     // quel bâtiment rendrait le plus ici ?
     const cand = Object.entries(BUILDINGS)
       .filter(([k,B2]) => (!B2.tech || aTech(p,B2.tech)) && (!B2.cote || t.terr === 'cote'))

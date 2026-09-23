@@ -198,7 +198,8 @@ window.addEventListener('resize', ()=>{ resize(); adapterInterface(); });
 // zoom qui fait tenir tout le monde à l'écran
 function zoomAjuste(){
   if(!IW) return 1;
-  return clamp(Math.min(VW/(IW*1.04), VH/(IH*1.04)), 0.25, 1.6);
+  // vue d'ensemble : on ne grossit pas au-delà du confortable
+  return clamp(Math.min(VW/(IW*1.04), VH/(IH*1.04)), 0.12, 1.6);
 }
 function toutVoir(){
   S.cam.z = zoomAjuste();
@@ -729,7 +730,7 @@ cv.addEventListener('mouseleave', ()=>{
 });
 cv.addEventListener('wheel', e=>{
   e.preventDefault();
-  S.cam.z = clamp(S.cam.z * (e.deltaY<0?1.12:0.89), 0.25, 2.2);
+  S.cam.z = clamp(S.cam.z * (e.deltaY<0?1.12:0.89), 0.12, 7);
 },{passive:false});
 
 // tactile : glisser pour déplacer, pincer pour zoomer
@@ -741,7 +742,7 @@ cv.addEventListener('touchstart', e=>{
 cv.addEventListener('touchmove', e=>{
   if(e.touches.length===2 && pinch){
     const d = dist2(e.touches);
-    S.cam.z = clamp(S.cam.z * d/pinch, 0.25, 2.2); pinch = d;
+    S.cam.z = clamp(S.cam.z * d/pinch, 0.12, 7); pinch = d;
   } else if(drag && e.touches.length===1){
     const t = e.touches[0];
     S.cam.x += (t.clientX-drag.x)/S.cam.z; S.cam.y += (t.clientY-drag.y)/(S.cam.z*SQ);
@@ -760,7 +761,8 @@ function infobulle(e){
       `<b>${TERRAIN[survol.terr].nom}</b><span class="tsep">${survol.pop.toFixed(1)}k hab.</span>`
       + (own? `<div><i class="flag" style="background:${own.col}"></i>${own.nom}</div>`
             : '<div class="muted">Terre inoccupée</div>')
-      + (survol.bld? `<div>${ic(survol.bld)} ${BUILDINGS[survol.bld].nom}</div>` : '')
+      + (typeof nbBatiments === 'function' && nbBatiments(survol)
+          ? `<div>${batiments(survol).map(k=>ic(k)+' '+BUILDINGS[k].nom).join(' · ')}</div>` : '')
       + (survol.fort? `<div class="muted">Fortifications +${survol.fort}%</div>` : '')
       + (survol.occ? `<div style="color:${S.nations[survol.occ.par].col}">Occupée à ${Math.round(survol.occ.val*100)}% par ${S.nations[survol.occ.par].nom}</div>` : '');
     tip.style.left = Math.min(e.clientX+16, window.innerWidth-250)+'px';
@@ -800,7 +802,7 @@ window.addEventListener('keydown', e=>{
   if(e.code==='KeyC') centrer(S.player.capitale, true);
   if(e.code==='KeyF') toutVoir();
   if(e.code==='KeyM') basculerMini();
-  if(e.code==='Equal'||e.code==='NumpadAdd')      S.cam.z = clamp(S.cam.z*1.15, 0.25, 2.2);
-  if(e.code==='Minus'||e.code==='NumpadSubtract') S.cam.z = clamp(S.cam.z*0.87, 0.25, 2.2);
+  if(e.code==='Equal'||e.code==='NumpadAdd')      S.cam.z = clamp(S.cam.z*1.15, 0.12, 7);
+  if(e.code==='Minus'||e.code==='NumpadSubtract') S.cam.z = clamp(S.cam.z*0.87, 0.12, 7);
 });
 window.addEventListener('keyup', e=> touches.delete(e.code));

@@ -59,6 +59,74 @@ const UNITES = {
 };
 const CLES_UNITES = Object.keys(UNITES);
 
+/* ===========================================================
+   BÂTIMENTS D'UNE PROVINCE
+   Une province en porte plusieurs, dans la limite de ce que sa
+   population et son terrain supportent. Plus elle est dédiée à
+   un même ouvrage, plus elle y est efficace : c'est la
+   spécialisation. `t.bld` reste le bâtiment dominant, pour que
+   la carte et les infobulles n'aient rien à réapprendre.
+   =========================================================== */
+
+const batiments = t => (t && t.blds) ? t.blds : [];
+const nbBatiments = t => batiments(t).length;
+const aBatiment = (t, k) => batiments(t).includes(k);
+
+// combien d'ouvrages une province peut porter
+function capaciteBat(t){
+  if(!t || t.terr === 'ocean') return 0;
+  const plafond = TERRAIN[t.terr].hab >= 1 ? 5 : TERRAIN[t.terr].hab >= 0.6 ? 4 : 3;
+  return clamp(1 + Math.floor(t.pop / 8), 1, plafond);
+}
+const placeLibre = t => nbBatiments(t) < capaciteBat(t);
+
+// le type le plus représenté, et la part qu'il occupe
+function specialite(t){
+  const l = batiments(t);
+  if(!l.length) return {cle:null, part:0, nb:0};
+  const compte = {};
+  for(const k of l) compte[k] = (compte[k]||0) + 1;
+  let cle = l[0], nb = 0;
+  for(const k in compte) if(compte[k] > nb){ nb = compte[k]; cle = k; }
+  return {cle, part: nb / l.length, nb};
+}
+
+// une province dédiée rend davantage — jusqu'à +45% quand tout y concourt
+function multSpecialite(t, cle){
+  const s2 = specialite(t);
+  if(s2.cle !== cle || s2.nb < 2) return 1;
+  return 1 + Math.max(0, s2.part - 0.5) * 0.9;
+}
+
+// `t.bld` suit toujours le dominant : la carte et le reste du code s'y fient
+function rangerBatiments(t){
+  t.blds = batiments(t).slice().sort();
+  t.bld = t.blds.length ? specialite(t).cle : null;
+  return t;
+}
+function ajouterBatiment(t, k){ t.blds = batiments(t).concat([k]); return rangerBatiments(t); }
+function retirerBatiment(t, k){
+  const l = batiments(t).slice(), i = l.indexOf(k);
+  if(i >= 0) l.splice(i, 1);
+  t.blds = l; return rangerBatiments(t);
+}
+
+// production d'une province, spécialisation comprise
+function effetsProvince(t, n){
+  const out = {food:0, mat:0, gold:0, sci:0, energie:0, bonheur:0, def:0, up:0};
+  for(const k of batiments(t)){
+    const B = BUILDINGS[k]; if(!B) continue;
+    const m = multSpecialite(t, k);
+    out.up += B.up;
+    for(const [q, v] of Object.entries(B.eff)){
+      if(q === 'energie') out.energie += (v + (k === 'centrale' && aTech(n,'electricite') ? 6 : 0)) * (v > 0 ? m : 1);
+      else if(q === 'food') out.food += v * (aTech(n,'agronomie') ? 1.5 : 1) * m;
+      else out[q] = (out[q] || 0) + v * m;
+    }
+  }
+  return out;
+}
+
 const armeeVide = ()=> ({infanterie:0, artillerie:0, chars:0, avions:0, navires:0});
 const nbUnites  = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0),0);
 const effectifs = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].hommes,0);
@@ -142,7 +210,7 @@ function genererMonde(cfg = CONFIG){
   // 1. disque d'hexagones
   for(let q=-RAYON;q<=RAYON;q++){
     for(let r=Math.max(-RAYON,-q-RAYON); r<=Math.min(RAYON,-q+RAYON); r++){
-      S.tiles.set(key(q,r),{q,r,terr:'ocean',owner:null,pop:0,bld:null,fort:0,occ:null,geo:null});
+      S.tiles.set(key(q,r),{q,r,terr:'ocean',owner:null,pop:0,bld:null,blds:[],fort:0,occ:null,geo:null});
     }
   }
   // 2. îles : autant de noyaux que demandé, chacun poussant à la taille voulue
@@ -250,7 +318,7 @@ function genererMonde(cfg = CONFIG){
 
     // territoire de départ : la capitale, et rien d'autre.
     // Tout le reste se colonise ou se conquiert.
-    best.owner = i; best.pop = 18; best.bld = 'ferme';
+    best.owner = i; best.pop = 18; best.blds = []; ajouterBatiment(best, 'ferme');
   }
   // relations initiales
   for(const a of S.nations) for(const b of S.nations)
@@ -292,17 +360,15 @@ function bilan(n){
     pop += t.pop;
     food += (T0.food + t.pop*0.05)*occ;
     mat  += T0.mat*0.5*occ;
-    const b = t.bld && BUILDINGS[t.bld];
-    if(b){
-      upkeep += b.up;
-      for(const [k,v] of Object.entries(b.eff)){
-        if(k==='food') food += v * (aTech(n,'agronomie')?1.5:1) * occ;
-        else if(k==='mat') mat += v*occ;
-        else if(k==='gold') gold += v*occ;
-        else if(k==='sci') sci += v*occ;
-        else if(k==='energie') energie += v + (t.bld==='centrale'&&aTech(n,'electricite')?6:0);
-        else if(k==='bonheur') bonus += v;
-      }
+    if(nbBatiments(t)){
+      const e = effetsProvince(t, n);
+      upkeep  += e.up;
+      food    += e.food * occ;
+      mat     += e.mat  * occ;
+      gold    += e.gold * occ;
+      sci     += e.sci  * occ;
+      energie += e.energie;
+      bonus   += e.bonheur;
     }
   }
   gold += pop * n.taxe * 0.55 * (aTech(n,'fiscalite')?1.25:1);
@@ -385,7 +451,7 @@ function tickMois(){
                  * (aTech(n,'medecine')?1.5:1)
                  * (n.bonheur>50?1:0.5);
     for(const t of ts){
-      const capMax = 10 + TERRAIN[t.terr].hab*22 + (t.bld==='ferme'?15:0);
+      const capMax = 10 + TERRAIN[t.terr].hab*22 + (aBatiment(t,'ferme')?15:0);
       t.pop = clamp(t.pop + t.pop*croiss + (t.pop<capMax?0.05:-0.05), 0.5, capMax);
     }
 
@@ -429,13 +495,13 @@ function tickMois(){
 function iaJoue(n, b){
   // construire
   if(n.or>200 && n.mat>60 && Math.random()<0.25){
-    const ts = tuilesDe(n).filter(t=>!t.bld);
+    const ts = tuilesDe(n).filter(t=>placeLibre(t));
     if(ts.length){
       const t = pick(ts);
       const opts = Object.entries(BUILDINGS).filter(([k,v])=>
         (!v.tech||n.tech.has(v.tech)) && (!v.cote||t.terr==='cote'));
       if(opts.length){ const [k,v]=pick(opts);
-        if(n.or>=v.or&&n.mat>=v.mat){ n.or-=v.or; n.mat-=v.mat; t.bld=k; } }
+        if(n.or>=v.or&&n.mat>=v.mat){ n.or-=v.or; n.mat-=v.mat; ajouterBatiment(t,k); } }
     }
   }
   // recruter
@@ -512,7 +578,7 @@ function bataille(att, def, tuile, frac, debarquement){
       ? 'Aucune troupe embarquable : il faut des navires pour porter les hommes.'
       : 'Aucune unité disponible pour cet assaut.','bad'); return; }
 
-  const fortif = TERRAIN[tuile.terr].def + (tuile.bld==='caserne'?20:0) + tuile.fort;
+  const fortif = TERRAIN[tuile.terr].def + (aBatiment(tuile,'caserne')?20:0) + tuile.fort;
   const partAir = (corps.avions||0)/nb;              // l'aviation contourne les fortifications
   const fortEff = fortif * (1 - 0.55*partAir);
 
@@ -672,24 +738,51 @@ function panProvince(){
     <div class="row"><span>Population</span><span>${t.pop.toFixed(1)}k</span></div>
     <div class="row"><span>Nourriture / Matériaux</span><span>${T0.food} / ${T0.mat}</span></div>
     <div class="row"><span>Bonus défensif</span><span>+${T0.def+t.fort}%</span></div>
-    <div class="row"><span>Bâtiment</span><span>${t.bld?ic(t.bld)+' '+BUILDINGS[t.bld].nom:'—'}</span></div>`;
+    <div class="row"><span>Ouvrages</span><span>${nbBatiments(t)} / ${capaciteBat(t)}</span></div>`;
+  const sp = specialite(t);
+  if(sp.nb > 1){
+    const m = multSpecialite(t, sp.cle);
+    h += `<div class="row"><span>Spécialité</span><span style="color:${m>1?'#7ee0d0':'#fff'}">`
+       + `${ic(sp.cle)} ${BUILDINGS[sp.cle].nom} ${Math.round(sp.part*100)}%`
+       + `${m>1?` · rendement ×${m.toFixed(2)}`:''}</span></div>`;
+  }
 
   const p = S.player;
   if(t.owner===p.id){
-    if(!t.bld){
+    // --- ce qui est déjà bâti, avec sa démolition propre ---
+    if(nbBatiments(t)){
+      h += '<h3 style="margin-top:14px">Sur place</h3>';
+      const compte = {};
+      for(const k of batiments(t)) compte[k] = (compte[k]||0) + 1;
+      for(const [k, q] of Object.entries(compte)){
+        const m = multSpecialite(t, k);
+        h += `<div class="card unit" style="padding:0.5rem 0.625rem">
+          <div class="uhead"><span class="uname">${ic(k)} ${BUILDINGS[k].nom}${q>1?` ×${q}`:''}</span>
+            <button class="btn mini danger" data-raser="${k}" style="flex:none;width:auto"
+              ${bridePause('raser')}>−1</button></div>
+          <div class="muted">${BUILDINGS[k].desc}${m>1?` · ×${m.toFixed(2)} par spécialisation`:''}</div>
+        </div>`;
+      }
+    }
+    // --- ce qu'on peut encore y bâtir ---
+    if(placeLibre(t)){
       h += '<h3 style="margin-top:14px">Construire</h3>';
       for(const [k,b] of Object.entries(BUILDINGS)){
         const verrou = b.tech && !p.tech.has(b.tech);
         const mauvaisSol = b.cote && t.terr!=='cote';
         const cher = p.or<b.or || p.mat<b.mat;
+        const deja = batiments(t).filter(x=>x===k).length;
+        const apres = deja ? (deja+1)/(nbBatiments(t)+1) : 0;
+        const gain = apres > 0.5 ? ` · porterait la spécialité à ${Math.round(apres*100)}%` : '';
         h += `<button class="btn" data-build="${k}" ${bridePause('batir', verrou||mauvaisSol||cher)}>
-          ${ic(k)} ${b.nom}<span class="cost">${b.or}${ic('or')} ${b.mat}${ic('mat')}</span>
-          <div class="muted">${verrou?`${ic('verrou')} Requiert `+TECHS[b.tech].nom : mauvaisSol?'Côte uniquement' : b.desc}</div>
+          ${ic(k)} ${b.nom}${deja?` (déjà ${deja})`:''}<span class="cost">${b.or}${ic('or')} ${b.mat}${ic('mat')}</span>
+          <div class="muted">${verrou?`${ic('verrou')} Requiert `+TECHS[b.tech].nom : mauvaisSol?'Côte uniquement' : b.desc+gain}</div>
         </button>`;
       }
     } else {
-      h += `<p class="muted">${BUILDINGS[t.bld].desc}</p>
-        <button class="btn danger" data-raser="1" ${bridePause('raser')}>Démolir (récupère 30% des matériaux)</button>`;
+      h += `<p class="muted" style="margin-top:0.875rem">${ic('verrou')} Plus de place : `
+         + `${capaciteBat(t)} ouvrages pour ${t.pop.toFixed(1)}k habitants sur ce terrain. `
+         + `La population en fera de la place en grandissant.</p>`;
     }
     h += `<button class="btn" data-fort="1" ${bridePause('fortifier', p.or<80||t.fort>=40)}>
       ${ic('fortifier')} Fortifier (+10% défense)<span class="cost">80${ic('or')}</span></button>`;
@@ -707,7 +800,7 @@ function panProvince(){
           ${ic('coloniser')} Fonder un comptoir outre-mer
           <span class="cost">${COUT_COLONIE_MER}${ic('or')}</span></button>`;
   } else if(n && p.guerre.has(n.id) && voisins(t).some(v=>v.owner===p.id)){
-    const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
+    const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
     h += `<h3 style="margin-top:14px">Offensive</h3>
       <div class="row"><span>Ton attaque</span><span>${forceAtt(p.armee,p).toFixed(0)}</span></div>
       <div class="row"><span>Défense sur place</span><span>${(forceDef(n.armee,n)*(1+fortif/100)).toFixed(0)}</span></div>
@@ -717,7 +810,7 @@ function panProvince(){
         ${ic('guerre')} Engager ${pct}% des forces<span class="cost">${texteArmee(apercuDetachement(p.armee,pct/100))}</span></button>`;
   } else if(n && p.guerre.has(n.id) && cibleNavale(p, t)){
     const m = cibleNavale(p, t), gene = obstacleNaval(p);
-    const fortif = TERRAIN[t.terr].def + (t.bld==='caserne'?20:0) + t.fort;
+    const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
     h += `<h3 style="margin-top:14px">Débarquement</h3>
       <div class="row"><span>Traversée</span><span>${m.distance} case${m.distance>1?'s':''} de mer / portée ${m.portee}</span></div>
       <div class="row"><span>Capacité de transport</span><span>${m.capacite} unité${m.capacite>1?'s':''}</span></div>
@@ -740,13 +833,15 @@ function panProvince(){
   el.querySelectorAll('[data-build]').forEach(btn=> btn.onclick = ()=>{
     if(!actionPermise('batir')) return refuserPause();
     const b = BUILDINGS[btn.dataset.build];
-    p.or-=b.or; p.mat-=b.mat; t.bld=btn.dataset.build;
+    p.or-=b.or; p.mat-=b.mat; ajouterBatiment(t, btn.dataset.build);
     logue(`${ic('batir')} ${b.nom} construit.`); majUI(); dessiner();
   });
   const q = s => el.querySelector(s);
-  if(q('[data-raser]')) q('[data-raser]').onclick = ()=>{
+  el.querySelectorAll('[data-raser]').forEach(btn => btn.onclick = ()=>{
     if(!actionPermise('raser')) return refuserPause();
-    p.mat += BUILDINGS[t.bld].mat*0.3; t.bld=null; majUI(); dessiner(); };
+    const k = btn.dataset.raser;
+    if(!aBatiment(t, k)) return;
+    p.mat += BUILDINGS[k].mat*0.3; retirerBatiment(t, k); majUI(); dessiner(); });
   if(q('[data-fort]')) q('[data-fort]').onclick = ()=>{
     if(!actionPermise('fortifier')) return refuserPause();
     p.or-=80; t.fort+=10; majUI(); };
@@ -1447,7 +1542,7 @@ function sauvegarder(auto){
       log: S.log.slice(-150),
       tiles: [...S.tiles.values()].map(t=>({
         q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:+t.pop.toFixed(2),
-        bld:t.bld, fort:t.fort, occ: t.occ ? {par:t.occ.par, val:+t.occ.val.toFixed(3), mois:t.occ.mois} : null,
+        blds:batiments(t), fort:t.fort, occ: t.occ ? {par:t.occ.par, val:+t.occ.val.toFixed(3), mois:t.occ.mois} : null,
       })),
     };
     localStorage.setItem(CLE_SAUV, JSON.stringify(d));
@@ -1478,7 +1573,9 @@ function appliquerSauvegarde(d){
   S.tiles = new Map(); S.nations = []; S.sel = null; S.mois = d.mois;
   for(const t of d.tiles)
     S.tiles.set(key(t.q,t.r), {q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:t.pop,
-      bld:t.bld, fort:t.fort, occ:t.occ, geo:null});
+      bld:null, blds:Array.isArray(t.blds) ? t.blds.slice() : (t.bld ? [t.bld] : []),
+      fort:t.fort, occ:t.occ, geo:null});
+  for(const t of S.tiles.values()) rangerBatiments(t);   // le dominant se recalcule
   for(const n of d.nations){
     const nat = {...n, tech:new Set(n.tech), guerre:new Set(n.guerre),
       allies:new Set(n.allies), pacte:new Set(n.pacte), commerce:new Set(n.commerce||[]),
@@ -1623,6 +1720,9 @@ function texteAide(){
   <div class="grille">
     <div class="bloc"><b>Temps</b><kbd>Espace</kbd> pause/reprise · boutons <kbd>0,5x</kbd> <kbd>1x</kbd> <kbd>2x</kbd> <kbd>4x</kbd>.
       En pause tout s'arrête : tu peux discuter et lever des troupes, rien d'autre.</div>
+    <div class="bloc"><b>${ic('batir')} Provinces</b>Une province porte plusieurs ouvrages selon sa
+      population et son terrain. Plus elle est <b>dédiée</b> à un même métier, plus elle y rend :
+      jusqu'à +45% pour une province entièrement spécialisée.</div>
     <div class="bloc"><b>${ic('navires')} La mer</b>Pour passer d'une île à l'autre il faut la
       <b>Navigation</b>, une province côtière et des <b>navires</b> : chacun porte 3 unités.
       La portée s'étend avec l'Industrie, l'Électricité et un port. Les troupes débarquées

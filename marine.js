@@ -12,7 +12,7 @@ function porteeNavale(n){
   let p = 3;                                  // cabotage : on longe les côtes
   if(aTech(n, 'industrie'))    p += 2;        // coques de fer, machines à vapeur
   if(aTech(n, 'electricite'))  p += 3;        // navigation moderne
-  for(const t of tuilesDe(n)) if(t.bld === 'port'){ p += 1; break; }   // une base navale
+  for(const t of tuilesDe(n)) if(aBatiment(t, 'port')){ p += 1; break; }   // une base navale
   return p;
 }
 

@@ -12,6 +12,17 @@ que tout le monde tienne — une seule île minuscule avec onze adversaires sera
 agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
 jamais : franchir un bras de mer demande une marine.
 
+## Les provinces
+
+Une province porte **plusieurs ouvrages**, dans la limite de ce que sa population
+et son terrain supportent — d'un seul sur une montagne peu peuplée à cinq sur une
+plaine populeuse. La capacité grandit avec les habitants.
+
+Et plus une province est **dédiée** à un même ouvrage, plus elle y est efficace :
+au-delà de la moitié, le rendement de la spécialité monte, jusqu'à +45 % pour une
+province entièrement consacrée à un seul métier. Trois mines groupées valent plus
+que trois mines éparpillées. Le Conseil en tient compte quand il choisit où bâtir.
+
 ## La mer
 
 Sans flotte, un archipel est une prison. Une expédition outre-mer exige trois
