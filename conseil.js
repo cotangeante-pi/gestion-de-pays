@@ -34,7 +34,8 @@ function diagnostic(sujet){
 
   if(sujet === 'bonheur'){
     const cible = 55 - (p.taxe-0.3)*120 + b.bonus + (p.nourriture>40?8:0) - p.guerre.size*7
-                - (p.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (p.or<0?15:0);
+                - (p.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (p.or<0?15:0)
+                - malusCapitale(p);
     lignes.push({quoi:'base', v:55, txt:'humeur de fond du peuple'});
     lignes.push({quoi:'impots', v:-(p.taxe-0.3)*120,
       txt:`impôts à ${(p.taxe*100).toFixed(0)}% (${p.taxe>0.3?'au-dessus':'en dessous'} du seuil de tolérance de 30%)`});
@@ -44,6 +45,9 @@ function diagnostic(sujet){
     if(p.nourriture<0)     lignes.push({quoi:'famine', v:-30, txt:'FAMINE'});
     if(b.penurieEnergie)   lignes.push({quoi:'energie', v:-10, txt:'pénurie d\'énergie'});
     if(p.or<0)             lignes.push({quoi:'faillite', v:-15, txt:'trésor à découvert'});
+    if(malusCapitale(p) > 0.5) lignes.push({quoi:'capitale', v:-malusCapitale(p),
+      txt:`capitale perdue — le pays s'en remet encore `
+        + `(${Math.max(0, DEUIL_CAPITALE - (S.mois - p.chocCapitale.depuis))} mois)`});
     return {sujet, valeur:p.bonheur, cible, lignes, unite:''};
   }
 
@@ -103,8 +107,11 @@ function projeterEtat(mois = 12){
     e.nourriture = clamp(e.nourriture + food - conso, -50, 400);
     e.sci += b.sci;
 
+    // le deuil de la capitale se dissipe au fil de la projection
+    const deuil = p.chocCapitale
+      ? p.chocCapitale.force * Math.max(0, 1 - (S.mois + m - p.chocCapitale.depuis)/DEUIL_CAPITALE) : 0;
     const cible = 55 - (p.taxe-0.3)*120 + b.bonus + (e.nourriture>40?8:0) - p.guerre.size*7
-                - (e.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (e.or<0?15:0);
+                - (e.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (e.or<0?15:0) - deuil;
     e.bonheur = clamp(e.bonheur + clamp(cible - e.bonheur, -3, 3), 0, 100);
 
     const croiss = (e.nourriture > 0 ? 0.006 : -0.02) * (aTech(p,'medecine')?1.5:1) * (e.bonheur>50?1:0.5);
@@ -422,7 +429,9 @@ function repRapport(){
   l.push(`Trésor ${Math.round(p.or)} or (${fmtOr(b.net)}/mois) · matériaux ${Math.round(p.mat)} (${fmtOr(b.mat)}/mois)`);
   l.push(`Nourriture ${Math.round(p.nourriture)} (${fmtOr(b.netFood)}/mois) · population ${b.pop.toFixed(0)}k`);
   l.push(`Énergie ${b.energie.toFixed(0)} · recherche ${fmtOr(b.sci)}/mois${p.rech?` sur « ${TECHS[p.rech].nom} » (${Math.round(p.sci)}/${TECHS[p.rech].cout})`:' — aucune en cours'}`);
-  l.push(`Bonheur ${Math.round(p.bonheur)}/100 · impôts ${(p.taxe*100).toFixed(0)}% · ${b.nb} provinces`);
+  l.push(`Bonheur ${Math.round(p.bonheur)}/100 · impôts ${(p.taxe*100).toFixed(0)}% · ${b.nb} provinces`
+    + (malusCapitale(p) > 0.5
+       ? ` · capitale perdue : −${malusCapitale(p).toFixed(1)} de bonheur` : ''));
   l.push(`Armée ${nbUnites(p.armee)} unités, puissance ${puissance(p).toFixed(0)}${m?` · principale menace : ${m.nation.nom} (${m.ratio.toFixed(2)}×)`:''}`);
   let t = `État du royaume, ${dateTexte()} :\n${listePuces(l)}`;
   if(pr.evts.length) t += `\n\nCe qui vient : ${pr.evts.map(e=>`${e.txt} dans ${e.m} mois`).join(', ')}.`;
@@ -914,7 +923,9 @@ function repProvince(an){
   const t = (an.slots?.capitale && p.capitale) ? p.capitale
           : (S.sel && S.sel.owner === p.id) ? S.sel
           : C.contexte.province || p.capitale;
-  if(!t) return `Sélectionne une province sur la carte, ou dis « parle-moi de ma capitale ».`;
+  if(!t) return p.capitale
+    ? `Sélectionne une province sur la carte, ou dis « parle-moi de ma capitale ».`
+    : `Tu n'as plus de capitale, et plus rien à me montrer.`;
   if(t.owner !== p.id) return `${nomTuile(t)} ne t'appartient pas : elle est à ${t.owner===null?'personne':S.nations[t.owner].nom}.`;
   C.contexte.province = t;
 
@@ -986,7 +997,8 @@ function ordreImpot(an){
   taux = clamp(taux, 0, 0.8);
   const dOr = b.pop*0.55*(taux - p.taxe)*(aTech(p,'fiscalite')?1.25:1);
   const cible = Math.round(55 - (taux-0.3)*120 + b.bonus + (p.nourriture>40?8:0) - p.guerre.size*7
-                          - (p.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (p.or<0?15:0));
+                          - (p.nourriture<0?30:0) - (b.penurieEnergie?10:0) - (p.or<0?15:0)
+                          - malusCapitale(p));
   const r = executer({type:'impot', taux});
   return `Fait : ${r.txt}. Revenus ${fmtOr(dOr)} or par mois, et le bonheur visera désormais ${cible} `
        + `(contre ${Math.round(p.bonheur)} aujourd'hui).`;

@@ -12,6 +12,15 @@ que tout le monde tienne — une seule île minuscule avec onze adversaires sera
 agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
 jamais : franchir un bras de mer demande une marine.
 
+## La capitale
+
+Chaque nation a une capitale, placée loin des autres. Elle n'est pas qu'un
+repère : la perdre **ébranle le pays**. Le siège du royaume se replie aussitôt
+sur la province la plus peuplée qui reste, et le moral encaisse 14 points qui se
+résorbent sur 30 mois. Reprendre sa ville efface la moitié de ce qu'il restait
+de deuil et y ramène le siège. Une nation qui n'a plus rien n'a plus de
+capitale — et le dit.
+
 ## Les provinces
 
 Une province porte **plusieurs ouvrages**, dans la limite de ce que sa population

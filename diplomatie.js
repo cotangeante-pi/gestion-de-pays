@@ -665,10 +665,14 @@ function replique(n, an, d){
         case 'technologies': return n.tech.size
           ? `Mes savants m'ont donné : ${[...n.tech].map(t2=>TECHS[t2].nom).join(', ')}.`
           : `Mes savants ne m'ont encore rien donné, ${A}. Cela viendra.`;
-        case 'capitale':     return n.capitale
-          ? `Ma capitale est en ${TERRAIN[n.capitale.terr].nom.toLowerCase()}, `
-            + `et elle ne bougera pas, ${A}.`
-          : `Je n'ai plus de capitale à te montrer.`;
+        case 'capitale': {
+          if(!n.capitale) return `Je n'ai plus de capitale, ${A} — ni grand-chose d'autre.`;
+          const deuil = typeof malusCapitale === 'function' ? malusCapitale(n) : 0;
+          return `Ma capitale est en ${TERRAIN[n.capitale.terr].nom.toLowerCase()}, ${A}`
+            + (deuil > 0.5
+               ? `. Ce n'est pas celle de mes pères : on me l'a prise, et je n'ai pas fini de le digérer.`
+               : `, et elle ne bougera pas.`);
+        }
         case 'regne':        return `Je règne depuis ${S.mois} mois, ${A} — `
           + `assez pour avoir vu passer quelques ambitieux.`;
         case 'armee':        return `${nbUnites(n.armee)} unités, `

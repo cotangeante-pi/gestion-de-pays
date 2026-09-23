@@ -127,6 +127,64 @@ function effetsProvince(t, n){
   return out;
 }
 
+/* ===========================================================
+   LA CAPITALE
+   Elle n'est plus un simple repère : la perdre ébranle le pays,
+   et le siège se déplace vers la plus grande ville qui reste.
+   Reprendre son ancienne capitale apaise une part du choc.
+   =========================================================== */
+
+const CHOC_CAPITALE = 14;     // points de bonheur au moment de la chute
+const DEUIL_CAPITALE = 30;    // mois pour que la blessure se referme
+
+// ce que la perte coûte encore au moral, aujourd'hui
+function malusCapitale(n){
+  const c = n && n.chocCapitale;
+  if(!c) return 0;
+  const passe = S.mois - c.depuis;
+  if(passe >= DEUIL_CAPITALE) return 0;
+  return c.force * (1 - passe / DEUIL_CAPITALE);
+}
+
+// la plus grande ville qui reste fait le meilleur siège
+function meilleurSiege(n){
+  const l = tuilesDe(n);
+  if(!l.length) return null;
+  return l.slice().sort((a, b) =>
+      (b.pop - a.pop) || (nbBatiments(b) - nbBatiments(a)) || (b.fort - a.fort))[0];
+}
+
+// appelé quand la capitale de n vient de changer de main
+function deplacerCapitale(n, perdue){
+  n.ancienneCapitale = perdue;
+  n.chocCapitale = {depuis: S.mois, force: CHOC_CAPITALE};
+  const siege = meilleurSiege(n);
+  n.capitale = siege;
+  if(n.joueur){
+    if(siege) logue(`${ic('guerre')} <b>Ta capitale est tombée.</b> Le siège du royaume se replie `
+        + `sur ${nomTuile(siege)} — le pays est sonné pour ${DEUIL_CAPITALE} mois.`, 'bad');
+    else logue(`${ic('guerre')} <b>Ta capitale est tombée</b>, et il ne te reste rien.`, 'bad');
+  } else if(siege){
+    logue(`${ic('guerre')} La capitale de <b>${n.nom}</b> est tombée.`);
+  }
+}
+
+// n reprend la ville dont il avait été chassé
+function reprendreCapitale(n, tuile){
+  n.ancienneCapitale = null;
+  n.capitale = tuile;
+  if(n.chocCapitale){
+    // la moitié de ce qu'il restait de deuil est effacée
+    const reste = malusCapitale(n);
+    n.chocCapitale = reste > 0.5
+      ? {depuis: S.mois, force: reste * 0.5}
+      : null;
+  }
+  if(n.joueur) logue(`${ic('paix')} <b>Ta capitale est reprise.</b> Le siège du royaume y retourne `
+      + `et le peuple respire.`, 'good');
+  else logue(`${ic('paix')} <b>${n.nom}</b> reprend sa capitale.`);
+}
+
 const armeeVide = ()=> ({infanterie:0, artillerie:0, chars:0, avions:0, navires:0});
 const nbUnites  = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0),0);
 const effectifs = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].hommes,0);
@@ -439,7 +497,7 @@ function tickMois(){
 
     // bonheur
     let cible = 55 - (n.taxe-0.3)*120 + b.bonus + (n.nourriture>40?8:0)
-              - (n.guerre.size*7) + (n.allies.size*3);
+              - (n.guerre.size*7) + (n.allies.size*3) - malusCapitale(n);
     if(n.nourriture<0) cible -= 30;
     if(b.penurieEnergie) cible -= 10;
     if(n.or<0) cible -= 15;
@@ -612,7 +670,11 @@ function bataille(att, def, tuile, frac, debarquement){
   let txt, conquise = false;
   if(tuile.occ.val >= 1){
     const etaitAuJoueur = def.joueur;
+    const etaitCapitale = (def.capitale === tuile);
+    const reprise = (att.ancienneCapitale === tuile);
     tuile.owner = att.id; tuile.pop *= 0.85; tuile.fort = 0; tuile.occ = null;
+    if(etaitCapitale) deplacerCapitale(def, tuile);
+    if(reprise) reprendreCapitale(att, tuile);
     if(typeof oublierMer === 'function') oublierMer();   // les côtes ont changé de main
     // prime de trahison : le monde paie qui t'arrache une terre
     if(etaitAuJoueur && !att.joueur && typeof primeActive === 'function' && primeActive()){
@@ -1346,7 +1408,7 @@ window.addEventListener('keydown', e=>{
 });
 
 document.getElementById('btnCenter').innerHTML = ic('monde');
-document.getElementById('btnCenter').onclick = ()=> centrer(S.player.capitale, true);
+document.getElementById('btnCenter').onclick = ()=> centrer(S.player.capitale || tuilesDe(S.player)[0], true);
 
 // ---------- Démarrage ----------
 
@@ -1563,6 +1625,8 @@ function sauvegarder(auto){
         croyances:n.croyances ? {...n.croyances} : null, negociation:n.negociation || null,
         confirmation:n.confirmation || null, menaceEnCours:n.menaceEnCours || null,
         allianceJusqu:n.allianceJusqu || null, allianceDebut:n.allianceDebut || null,
+        chocCapitale:n.chocCapitale || null,
+        ancienneCapitale: n.ancienneCapitale ? key(n.ancienneCapitale.q, n.ancienneCapitale.r) : null,
         capitale: n.capitale ? key(n.capitale.q, n.capitale.r) : null,
       })),
       conseil: S.conseil ? {chat:S.conseil.chat.slice(-30)} : null,
@@ -1607,7 +1671,8 @@ function appliquerSauvegarde(d){
   for(const n of d.nations){
     const nat = {...n, tech:new Set(n.tech), guerre:new Set(n.guerre),
       allies:new Set(n.allies), pacte:new Set(n.pacte), commerce:new Set(n.commerce||[]),
-      capitale: n.capitale ? S.tiles.get(n.capitale) : null};
+      capitale: n.capitale ? S.tiles.get(n.capitale) : null,
+      ancienneCapitale: n.ancienneCapitale ? S.tiles.get(n.ancienneCapitale) : null};
     if(!nat.joueur) initDiplomatie(nat, nat.id);
     S.nations.push(nat);
     if(nat.joueur) S.player = nat;
@@ -1749,6 +1814,9 @@ function texteAide(){
   <div class="grille">
     <div class="bloc"><b>Temps</b><kbd>Espace</kbd> pause/reprise · boutons <kbd>0,5x</kbd> <kbd>1x</kbd> <kbd>2x</kbd> <kbd>4x</kbd>.
       En pause tout s'arrête : tu peux discuter et lever des troupes, rien d'autre.</div>
+    <div class="bloc"><b>${ic('monde')} Capitale</b>La perdre coûte <b>${CHOC_CAPITALE} points de bonheur</b>,
+      qui se résorbent sur ${DEUIL_CAPITALE} mois. Le siège se replie sur ta plus grande ville ;
+      reprendre l'ancienne efface la moitié du deuil. <kbd>C</kbd> pour y revenir.</div>
     <div class="bloc"><b>${ic('alliance')} Alliances</b>Une alliance se plaide : donne-lui de vraies
       raisons et le prix baisse. Elle dure <b>${DUREE_ALLIANCE} mois</b>. La rompre avant terme met
       ta tête à prix : <b>${PRIME_TRAHISON} or</b> à qui t'arrache une province.</div>

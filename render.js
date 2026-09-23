@@ -799,7 +799,7 @@ function majCamera(dt){
 window.addEventListener('keydown', e=>{
   if(document.getElementById('aide') && !document.getElementById('aide').classList.contains('hidden')) return;
   touches.add(e.code);
-  if(e.code==='KeyC') centrer(S.player.capitale, true);
+  if(e.code==='KeyC') centrer(S.player.capitale || tuilesDe(S.player)[0], true);
   if(e.code==='KeyF') toutVoir();
   if(e.code==='KeyM') basculerMini();
   if(e.code==='Equal'||e.code==='NumpadAdd')      S.cam.z = clamp(S.cam.z*1.15, 0.12, 7);
