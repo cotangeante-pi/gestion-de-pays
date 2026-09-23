@@ -434,3 +434,148 @@ EXPRESSIONS_DIPLO.push(
   [/\bbonne (journee|soiree|chance)\b/g, 'bonnejournee'],
   [/\bje te (remercie|suis reconnaissant)\b/g, 'remerci'],
 );
+
+
+/* ===========================================================
+   CONVERSATION ÉLARGIE — dix familles que le moteur ratait,
+   dont certaines qu'il interprétait à l'envers : « tu es un
+   menteur » concluait une alliance, « es-tu riche ? » lui
+   faisait empocher ton or.
+   =========================================================== */
+
+Object.assign(LEX, {
+  // --- menacer sans chiffrer ---
+  ras:{menace:.8, guerre:.6}, raser:{menace:.9, guerre:.7}, aneant:{menace:.9, guerre:.8},
+  mour:{menace:.8, guerre:.5}, mort:{menace:.6, guerre:.5}, tuer:{menace:.8, guerre:.6},
+  consequenc:{menace:.7}, regrett2:{menace:.6}, prevenu:{menace:.6}, avert:{menace:.7},
+  interet:{menace:.35}, obeis:{menace:.7}, ordre2:{menace:.5},
+  ecras2:{menace:.8, guerre:.6}, balay:{menace:.7, guerre:.5},
+  // --- promettre ---
+  promet:{promesse:1}, promesse:{promesse:1}, jure:{promesse:.9}, serment:{promesse:.8},
+  parole2:{promesse:.7, confiance:.5}, engag:{promesse:.7}, garantis:{promesse:.8},
+  comptesurmoi:{promesse:.9}, jamaisattaqu:{promesse:.9, paix:.4},
+  // --- s'informer sur lui ---
+  combien2:{info:.6, question:.7}, population2:{info:.8}, soldat2:{info:.6, force:.4},
+  technolog2:{info:.8}, capitale2:{info:.7}, regne:{info:.7}, ancien:{info:.5},
+  possedes:{info:.7, question:.4}, richesse2:{info:.6, argent:.4},
+  dismoi:{info:.5, question:.5}, renseign:{info:.8},
+  // --- marchander ---
+  moitie:{marchand:1}, moitiemoitie:{marchand:1}, poirendeux:{marchand:1},
+  dernierprix:{marchand:.9}, rabais:{marchand:.8}, remise:{marchand:.8},
+  partag2:{marchand:.6, echange:.5}, compromis:{marchand:.8, accord:.4},
+  milieu:{marchand:.6}, effort:{marchand:.5},
+  // --- affection et compassion ---
+  appreci:{affection:.9}, estim2:{affection:.7}, manqu:{affection:.7},
+  attach:{affection:.7}, cher2:{affection:.5}, amiti2:{affection:.8, union:.3},
+  condoleanc:{compassion:1}, compat:{compassion:.9}, desole2:{compassion:.6, excuse:.4},
+  peine2:{compassion:.7}, courage:{compassion:.6},
+  // --- reprocher ---
+  trahi2:{reproche:1, hostilite:.5}, menteur:{reproche:.9, hostilite:.4},
+  ment2:{reproche:.8}, vol:{reproche:.8, hostilite:.4}, voleur:{reproche:.9},
+  parjure:{reproche:.9}, exager:{reproche:.6}, assezdetoi:{reproche:.8, hostilite:.5},
+  faute:{reproche:.6}, deçu:{reproche:.6}, decu:{reproche:.6}, honte:{reproche:.6},
+  tenuparole:{reproche:.9},
+  // --- partager les dépouilles ---
+  partageons:{partage:1}, depouill:{partage:.8}, butin:{partage:.8},
+  sesterres:{partage:.8}, entrenous2:{partage:.5},
+  // --- méta ---
+  quepeuxtu:{meta:1}, regles2:{meta:.9}, repete:{meta:.9}, expliquetoi:{meta:.8},
+  capable:{meta:.6}, sujets:{meta:.6},
+  // --- correctifs de faux positifs ---
+  dirigeant:{politesse:.5}, souverain2:{politesse:.5}, grand2:{politesse:.6},
+  passage9:{passage:1}, travers:{passage:.7}, territoire2:{passage:.4},
+});
+
+Object.assign(ACTES, {
+  PROMESSE:   {promesse:1, confiance:.4},
+  INFO:       {info:1, question:.5},
+  MARCHANDE:  {marchand:1},
+  AFFECTION:  {affection:1, politesse:.3},
+  COMPASSION: {compassion:1},
+  REPROCHE:   {reproche:1, hostilite:.3},
+  PARTAGE:    {partage:1, union:.4},
+  META:       {meta:1, question:.4},
+  PASSAGE:    {passage:1, demande:.4},
+});
+DOMAINES.diplo.push('PROMESSE','INFO','MARCHANDE','AFFECTION','COMPASSION',
+                    'REPROCHE','PARTAGE','META','PASSAGE');
+CLES_LEX = Object.keys(LEX);
+
+EXPRESSIONS_DIPLO.push(
+  // menaces
+  [/\bprepare toi\b/g, 'menac'], [/\bsubis? les consequences\b/g, 'consequenc'],
+  [/\btu (vas|va) le regretter\b/g, 'regrett2'], [/\bpas deux fois\b/g, 'avert'],
+  [/\btu as interet\b/g, 'interet menac'], [/\bton or ou ton sang\b/g, 'menac argent'],
+  [/\b(paie|paye) ou meurs\b/g, 'menac argent'],
+  // promesses
+  [/\btu as ma parole\b/g, 'parole2 promet'], [/\bje (te )?(promets|jure)\b/g, 'promet'],
+  [/\bcompte sur moi\b/g, 'comptesurmoi'], [/\bje ne te trahirai jamais\b/g, 'promet'],
+  [/\bne jamais t attaquer\b/g, 'jamaisattaqu'],
+  // informations
+  [/\bcombien as tu\b/g, 'combien2'], [/\bquelle est ta population\b/g, 'population2'],
+  [/\bquelles technologies\b/g, 'technolog2'], [/\bou est ta capitale\b/g, 'capitale2'],
+  [/\bdepuis quand (regnes|tu regnes)\b/g, 'regne'], [/\bes tu riche\b/g, 'richesse2'],
+  [/\bque possedes tu\b/g, 'possedes'],
+  // marchandage
+  [/\bla moitie\b/g, 'moitie'], [/\bmoitie moitie\b/g, 'moitiemoitie'],
+  [/\bcoupons la poire en deux\b/g, 'poirendeux'], [/\bdernier prix\b/g, 'dernierprix'],
+  [/\bcoupons la (poire|difference)\b/g, 'poirendeux'],
+  // affection, compassion
+  [/\btu me manques\b/g, 'manqu'], [/\bje t apprecie\b/g, 'appreci'],
+  [/\btoutes mes condoleances\b/g, 'condoleanc'], [/\bje compatis\b/g, 'compat'],
+  // reproches
+  [/\btu m as trahi\b/g, 'trahi2'], [/\btu es un menteur\b/g, 'menteur'],
+  [/\btu n as pas tenu (ta )?parole\b/g, 'tenuparole'], [/\btu m as vole\b/g, 'vol'],
+  [/\bj en ai assez de toi\b/g, 'assezdetoi'], [/\btu exageres\b/g, 'exager'],
+  // partage
+  [/\bpartageons (ses|leurs|les) terres\b/g, 'partageons'],
+  [/\bpartageons le butin\b/g, 'partageons butin'],
+  // méta
+  [/\bque peux tu faire\b/g, 'quepeuxtu'], [/\bquelles sont les regles\b/g, 'regles2'],
+  [/\bexplique toi\b/g, 'expliquetoi'], [/\bde quoi peut on parler\b/g, 'quepeuxtu'],
+  // passage
+  [/\blaisse moi passer\b/g, 'passage9'], [/\bdroit de passage\b/g, 'passage9'],
+  [/\b(passer|traverser) (sur|par) tes (terres|territoires)\b/g, 'passage9'],
+  // « comment vas-tu » porte sur lui, pas sur son pays
+  [/\bcomment (vas|va) tu\b/g, 'sante etat'],
+  // politesse mal lue
+  [/\bgrand (dirigeant|souverain|roi|homme)\b/g, 'grand2 dirigeant'],
+);
+
+/* --- formes racinisées : radical() ampute ces mots avant la recherche.
+       Sans ces entrées, ils ne survivaient que par correspondance floue,
+       au poids affaibli — et parfois vers le mauvais concept. --- */
+Object.assign(LEX, {
+  arret:{ordre:.5, refus:.4},                   // ← arrete
+  aven:{projets:.6, futur:.5},                  // ← avenir
+  batt:{comparer:.4, guerre:.7},                // ← battre
+  bonnejourne:{adieu:.8, politesse:.5},         // ← bonnejournee
+  capabl:{meta:.6},                             // ← capable
+  casern:{batir:.5, force:.7},                  // ← caserne
+  central:{batir:.5, energie:1},                // ← centrale
+  clas:{classer:.8},                            // ← class
+  coloni:{lieu:.7, expansion:.9},               // ← colonis
+  depen:{argent:.7},                            // ← depens
+  depui:{histoire:.4, temps:.5},                // ← depuis
+  dirige:{politesse:.5},                        // ← dirigeant
+  dispo:{inventaire:.6, liste:.5},              // ← dispos
+  expliqu:{cause:.8, question:.5},              // ← explique
+  faibl:{comparer:.4, probleme:.5},             // ← faible
+  fair:{conseil:.45, ordre:.3},                 // ← faire
+  ferm:{batir:.5, lieu:.3, nourriture:.9},      // ← ferme
+  import:{conseil:.6},                          // ← important
+  longtemp:{temps:.7, futur:.4},                // ← longtemps
+  moiti:{marchand:1},                           // ← moitie
+  navi:{unite:.85, force:.5},                   // ← navire
+  nuclea:{science:.6, force:.7},                // ← nucleair
+  parju:{reproche:.9},                          // ← parjure
+  partage:{partage:1},                          // ← partageons
+  quell:{liste:.55, question:.5},               // ← quelles
+  sesterr:{partage:.8},                         // ← sesterres
+  souh:{attente:.8},                            // ← souhait
+  souven:{rappel:1},                            // ← souvenir
+  temp:{temps:.8, cout:.35},                    // ← temps
+  tenuparol:{reproche:.9},                      // ← tenuparole
+  usin:{batir:.5, argent:.6, industrie:.8},     // ← usine
+});
+CLES_LEX = Object.keys(LEX);

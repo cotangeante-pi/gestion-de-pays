@@ -34,6 +34,7 @@ function initDiplomatie(n, i){
   if(n.perso && PERSOS[n.perso]) Object.assign(n, {});   // rien à faire, garde la clé
 }
 const perso = n => PERSOS[n.perso] || PERSOS.prudent;
+const fmtSigne = x => (x>=0?'+':'') + Math.round(x*10)/10;
 
 /* ---------- utilitaires de conversation ---------- */
 function ajouterMsg(n, de, txt, meta){
@@ -265,6 +266,64 @@ function decider(n, an){
       E.relation = 2 + Math.round(k.chaleur*4); E.humeur = 0.12; return D({issue:'flatte'}); }
     return D({issue:'lasse'});
   }
+  /* --- dix familles de plus --- */
+  if(an.acte === 'PROMESSE'){
+    E.relation = 2 + Math.round(k.chaleur*3); E.humeur = 0.08;
+    return D({issue:'promesse'});
+  }
+  if(an.acte === 'INFO'){
+    const t = an.propre || '';
+    const quoi = /population|habitant|ame\b/.test(t) ? 'population'
+               : /technolog|science|savoir/.test(t)   ? 'technologies'
+               : /capital/.test(t)                     ? 'capitale'
+               : /regne|ancien|depuis quand/.test(t)   ? 'regne'
+               : /soldat|armee|troupe|unite|force/.test(t) ? 'armee'
+               : /rich|or\b|tresor|argent/.test(t)     ? 'richesse'
+               : 'general';
+    return D({issue:'info_detail', quoi});
+  }
+  if(an.acte === 'MARCHANDE'){
+    const g = n.negociation && S.mois - n.negociation.mois <= 8 ? n.negociation : null;
+    if(!g) return D({issue:'marchandeSansObjet'});
+    const plancher = Math.round(g.reserve * (1 + k.cupidite*0.12));
+    const propose = an.montant || Math.round(g.demande * 0.5);
+    if(propose >= plancher){
+      n.negociation = {...g, demande:propose};
+      return D({issue:'cede', action:g.action, prix:propose});
+    }
+    if((g.concessions||0) >= 2){ n.negociation = null; n.memoire.refus++;
+      return D({issue:'ferme', action:g.action, prix:g.demande}); }
+    const milieu = Math.max(plancher, Math.round((g.demande + propose)/2/10)*10);
+    n.negociation = {...g, demande:milieu, concessions:(g.concessions||0)+1};
+    return D({issue:'concede', action:g.action, prix:milieu, avant:g.demande});
+  }
+  if(an.acte === 'AFFECTION'){
+    E.relation = 3 + Math.round(k.chaleur*5); E.humeur = 0.12;
+    return D({issue:'affection'});
+  }
+  if(an.acte === 'COMPASSION'){
+    E.relation = 2 + Math.round(k.chaleur*4); E.humeur = 0.1;
+    return D({issue:'compassion'});
+  }
+  if(an.acte === 'REPROCHE'){
+    E.humeur = -0.12;
+    const m = n.memoire;
+    const fonde = m.trahisons > 0 || m.refus > 2 || m.menaces > 1;
+    if(!fonde) E.relation = -3;
+    return D({issue:'reproche', fonde});
+  }
+  if(an.acte === 'PARTAGE'){
+    const c = an.cible || [...n.guerre].map(i=>S.nations[i]).filter(o=>o && tuilesDe(o).length)[0];
+    if(!c) return D({issue:'flou', action:'AIDE_GUERRE'});
+    const ev = evaluer(n, 'AIDE_GUERRE', {cible:c});
+    if(ev.dU > 0){ E.guerreContre = c.id; E.relation = 4;
+      return D({issue:'accepte', action:'AIDE_GUERRE', facteurs:ev.facteurs, dU:ev.dU}); }
+    return D({issue:'partageRefus', cible:c, facteurs:ev.facteurs,
+              chances:gagneLaGuerre(n, c)});
+  }
+  if(an.acte === 'META')     return D({issue:'meta'});
+  if(an.acte === 'PASSAGE')  return D({issue:'passage'});
+
   if(an.acte === 'PROJETS')   return D({issue:'projets', alternative: meilleureAlternative(n)});
   if(an.acte === 'OPINION')   return D({issue:'opinion'});
   if(an.acte === 'GRATITUDE'){ E.relation = 1 + Math.round(k.chaleur*3); E.humeur = 0.06;
@@ -557,6 +616,73 @@ function replique(n, an, d){
     case 'annuleConfirm':
       return choix([`Soit. N'en parlons plus, ${A}.`, `J'oublie. Nous n'avons rien dit.`,
                     `Très bien — rien ne sera engagé.`]);
+
+    case 'promesse':
+      return fin(`Les promesses sont faciles, ${A} — je les note quand même. `
+        + `Je te crois fiable à ${Math.round(n.croyances.fiabilite*100)}%. `
+        + `${n.croyances.fiabilite > 0.7 ? 'Tu as tenu, jusqu\'ici.' : 'Prouve-le, et ce chiffre montera.'}`);
+
+    case 'info_detail': {
+      const b = bilan(n), pr = tuilesDe(n).length;
+      switch(d.quoi){
+        case 'population':   return `${b.pop.toFixed(0)}k âmes sur ${pr} provinces, ${A}. `
+          + `${b.netFood >= 0 ? 'Elles mangent à leur faim.' : 'Et je peine à les nourrir.'}`;
+        case 'technologies': return n.tech.size
+          ? `Mes savants m'ont donné : ${[...n.tech].map(t2=>TECHS[t2].nom).join(', ')}.`
+          : `Mes savants ne m'ont encore rien donné, ${A}. Cela viendra.`;
+        case 'capitale':     return n.capitale
+          ? `Ma capitale est en ${TERRAIN[n.capitale.terr].nom.toLowerCase()}, `
+            + `et elle ne bougera pas, ${A}.`
+          : `Je n'ai plus de capitale à te montrer.`;
+        case 'regne':        return `Je règne depuis ${S.mois} mois, ${A} — `
+          + `assez pour avoir vu passer quelques ambitieux.`;
+        case 'armee':        return `${nbUnites(n.armee)} unités, `
+          + `${effectifs(n.armee).toLocaleString('fr-FR')} hommes, puissance ${puissance(n).toFixed(0)}. `
+          + `Je te le dis sans détour : ${ratioForce(n, p) > 1 ? 'nous valons mieux que toi' : 'tu es plus fort, je le sais'}.`;
+        case 'richesse':     return `${Math.round(n.or)} or en caisse, ${fmtSigne(b.net)} par mois. `
+          + `${n.or > 600 ? 'De quoi voir venir.' : 'De quoi tenir, pas plus.'}`;
+        default:             return `Que veux-tu savoir au juste, ${A} ? Ma population, mon armée, `
+          + `mon trésor, mes savants, ma capitale — demande, je n'ai pas grand-chose à cacher.`;
+      }
+    }
+    case 'marchandeSansObjet':
+      return `Marchander quoi, ${A} ? Fais-moi d'abord une offre, et nous couperons la poire ensuite.`;
+
+    case 'affection':
+      return choix([`Voilà qui se dit rarement entre souverains, ${A}. J'y suis sensible.`,
+                    `L'amitié entre puissances est une chose fragile — mais j'accepte la tienne.`,
+                    `Tu me flattes, ${A}. Cela dit, je ne déteste pas.`]);
+    case 'compassion':
+      return choix([`Merci, ${A}. Les mots ne relèvent pas les morts, mais ils comptent.`,
+                    `C'est noté, et ce n'est pas rien.`,
+                    `Un peu de hauteur dans ce monde — merci, ${A}.`]);
+
+    case 'reproche': {
+      const m = n.memoire;
+      if(!d.fonde)
+        return fin(`Tu m'accuses, ${A} ? Cherche bien : je n'ai rien signé que je n'aie tenu. `
+          + `C'est toi qui m'as menacé ${m.menaces} fois et refusé ${m.refus} propositions.`);
+      return `Je ne le nierai pas, ${A}. J'ai fait ce que ma survie exigeait. `
+        + `Si tu veux réparer ce qui reste entre nous, dis-moi à quel prix.`;
+    }
+
+    case 'partageRefus': {
+      const c = d.cible;
+      return fin(`Me partager les terres de ${c.nom} ? Encore faudrait-il les prendre, ${A}. `
+        + `Je nous donne ${Math.round(d.chances*100)} chances sur 100 contre eux, `
+        + `et la note serait pour moi. Trouve-moi une meilleure raison — ou de l'or.`);
+    }
+
+    case 'meta':
+      return `Ce dont nous pouvons parler, ${A} ? La paix, un pacte, une alliance, le commerce, `
+        + `l'or — donné, prêté ou exigé. Tu peux me menacer, me flatter, m'insulter, t'excuser. `
+        + `Tu peux me demander mon état, mon avis sur un voisin, mes projets, ce que je pense de toi, `
+        + `ou ce que j'attends de toi. Je réponds à tout — et je m'en souviens.`;
+
+    case 'passage':
+      return rel(n,p) > 35
+        ? `Traverse mes terres si tu veux, ${A} — mais que tes hommes se tiennent.`
+        : `Mes routes ne sont pas les tiennes, ${A}. Signe d'abord quelque chose avec moi.`;
 
     case 'projets': {
       const b = bilan(n), m = mesurer(n);

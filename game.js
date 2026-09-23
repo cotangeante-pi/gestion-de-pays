@@ -65,9 +65,15 @@ const effectifs = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].hommes,0)
 const coutUp    = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].up,0);
 
 const NOMS_IA = ['Valoria','Karthag','Nordheim','Solmara','Ostragne','Tanzir',
-                 'Belgravie','Ryukan','Mirandel','Zephyra','Aldoria','Kesmir'];
+                 'Belgravie','Ryukan','Mirandel','Zephyra','Aldoria','Kesmir',
+                 'Thalassie','Vorn','Almerande','Kyrenor','Dravonie','Sélénie',
+                 'Harkaan','Morlave','Ustrenn','Calibra','Novogrod','Ythara',
+                 'Perendal','Skarn','Ombrelune','Tarquine','Velmoria','Azuria'];
 const COULEURS = ['#e05252','#e0a63a','#8e5ce0','#25b0a0','#d9569b','#5d7ce0',
-                  '#79b03a','#c96a28','#3ac4e0','#a8446b','#6ad95a','#b06be0'];
+                  '#79b03a','#c96a28','#3ac4e0','#a8446b','#6ad95a','#b06be0',
+                  '#ff8a5c','#4fd1a5','#c05cff','#e0c44a','#3e9de0','#e0607f',
+                  '#8fd44a','#d4763a','#5ce0c8','#9b5ce0','#e04a8a','#4ab8e0',
+                  '#b8e04a','#e07a4a','#7a5ce0','#4ae0a0','#e04a4a','#4a7ae0'];
 
 // ---------- État global ----------
 
@@ -104,8 +110,9 @@ const TAILLES = [
   {cle:'grandes',    nom:'grandes',    mult:1.55},
   {cle:'vastes',     nom:'vastes',     mult:2.30},
 ];
-const MAX_ADVERSAIRES = 11;                 // 12 noms et 12 couleurs disponibles
+const MAX_ADVERSAIRES = Math.min(NOMS_IA.length, COULEURS.length) - 1;   // autant que de noms
 
+const MAX_ILES = 18;
 const CONFIG = {adversaires:6, iles:6, taille:2};
 
 // surface de terre visée, et rayon de carte qui va avec
@@ -139,7 +146,7 @@ function genererMonde(cfg = CONFIG){
     }
   }
   // 2. îles : autant de noyaux que demandé, chacun poussant à la taille voulue
-  const noyaux = clamp(cfg.iles, 1, 12);
+  const noyaux = clamp(cfg.iles, 1, MAX_ILES);
   for(let i=0;i<noyaux;i++){
     // couronne régulière : c'est l'espacement qui fait l'archipel. Le rayon de
     // l'île attendue donne la distance minimale à tenir entre deux noyaux.
@@ -1244,7 +1251,7 @@ const nombreSur = (v, defaut) => Number.isFinite(+v) ? +v : defaut;
 
 function lireReglages(){
   CONFIG.adversaires = clamp(nombreSur(accueilEl('sAdv').value,    6), 1, MAX_ADVERSAIRES);
-  CONFIG.iles        = clamp(nombreSur(accueilEl('sIles').value,   6), 1, 8);
+  CONFIG.iles        = clamp(nombreSur(accueilEl('sIles').value,   6), 1, MAX_ILES);
   CONFIG.taille      = Math.round(clamp(nombreSur(accueilEl('sTaille').value, 2), 0, TAILLES.length-1));
 }
 

@@ -112,8 +112,11 @@ function analyserProposition(an, n){
   }
   // « 100 pièces ou je t'envahis » : la clause principale est nue, c'est quand même une exigence
   if(prop.sanction && prop.exige.or === null && prop.exige.traite === null && !prop.exige.province){
-    const som = montantDe(cls[0] ? cls[0].txt : '');
+    const t0 = cls[0] ? cls[0].txt : '';
+    const som = montantDe(t0);
     if(som !== null) prop.exige.or = som;
+    // « trois provinces ou je marche sur toi » : l'exigence porte sur la terre
+    else if(MOT_PROVINCE.test(' ' + t0 + ' ')) prop.exige.province = true;
   }
   prop.estUltimatum = !!(prop.sanction &&
                         (prop.exige.or !== null || prop.exige.province || prop.exige.traite));
