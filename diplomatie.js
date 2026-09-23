@@ -360,7 +360,9 @@ function decider(n, an){
   if(an.acte === 'ETAT')  return D({issue:'info'});
   if(an.acte === 'AVIS')  return D({issue:'avis', cible:an.cible});
   if(an.acte === 'SALUT') return D({issue:'salut', alternative: Math.random()<0.4 ? meilleureAlternative(n) : null});
-  if(an.acte === 'ACCORD' || an.acte === 'REFUS') return D({issue:'rienAAccepter'});
+  if(an.acte === 'ACCORD' || an.acte === 'REFUS')
+    return D({issue:'rienSurLaTable', refus: an.acte === 'REFUS',
+              alternative: meilleureAlternative(n)});
   return D({issue:'incompris', lectures: an.scores.slice(0,2).map(s=>s.acte)});
 }
 
@@ -464,7 +466,16 @@ function replique(n, an, d){
     case 'concede': return fin(`${d.avant} or te semblent trop ? Va pour ${d.prix}. C'est mon dernier mot, ou presque.`);
     case 'ferme':   return fin(`J'ai déjà cédé deux fois. La discussion est close.`);
     case 'insolvable': return `Tu acceptes ${d.prix} or que tu n'as pas, ${A}. Reviens les coffres pleins.`;
-    case 'rienAAccepter': return `Accepter quoi ? Je ne t'ai rien proposé, ${A}.`;
+    case 'rienSurLaTable': {
+      const suite = d.alternative
+        ? ` Si tu veux qu'il y ait quelque chose à discuter : ${choix(MOTS.objets[d.alternative.action] || ['un accord'])}.`
+        : ` Fais-moi une offre et nous aurons de quoi parler.`;
+      return (d.refus
+        ? choix([`Refuser quoi, ${A} ? Rien n'est sur la table entre nous.`,
+                 `Il n'y a pas de prix à baisser : je ne t'ai rien demandé, ${A}.`,
+                 `Tu dis non à quoi ? Je n'ai rien proposé.`])
+        : `Accepter quoi ? Je ne t'ai rien proposé, ${A}.`) + suite;
+    }
 
     case 'remercie': {
       let t = `${d.prix} or… ${majuscule(choix(['j\'accepte volontiers','voilà qui se remarque','ta générosité est notée']))}. (relation +${d.gain})`;

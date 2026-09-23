@@ -58,6 +58,19 @@
 <div id="vsplit" class="split" title="Glisse pour redimensionner · double-clic pour replier"></div>
 <div id="log"></div>
 
+<div id="combat" class="hidden">
+  <div class="combattete">
+    <div>
+      <b id="combatTitre"></b>
+      <div class="muted" id="combatLieu"></div>
+    </div>
+    <span class="combatfile" id="combatFile"></span>
+    <button id="combatGrand" title="Agrandir / réduire">⤢</button>
+    <button id="combatX" title="Fermer">×</button>
+  </div>
+  <canvas id="combatcv" width="260" height="150"></canvas>
+</div>
+
 <div id="tip" class="hidden"></div>
 
 <div id="aide" class="hidden">
@@ -101,6 +114,7 @@
 <script src="marine.js"></script>
 <script src="courrier.js"></script>
 <script src="alliance.js"></script>
+<script src="bataille-ecran.js"></script>
 <script src="relief.js"></script>
 <script src="render.js"></script>
 <script src="game.js"></script>

@@ -601,6 +601,7 @@ function bataille(att, def, tuile, frac, debarquement){
   const pertesD = appliquerPertes(def.armee, clamp(gagne? ratio*0.38 : 0.20-ratio*0.1, 0.02, 0.5));
   for(const k of CLES_UNITES) att.armee[k] += corps[k];   // les survivants rentrent
 
+  const occAvant = (tuile.occ && tuile.occ.par === att.id) ? tuile.occ.val : 0;
   // --- avancée du front : on ne prend pas une province d'un seul coup ---
   if(!tuile.occ || tuile.occ.par !== att.id) tuile.occ = {par:att.id, val:0, mois:S.mois};
   const gain = gagne ? clamp(0.14 + (ratio-0.5)*0.8, 0.08, 0.42)
@@ -626,6 +627,15 @@ function bataille(att, def, tuile, frac, debarquement){
   }
 
   if(typeof fxBataille === 'function') fxBataille(tuile, att.col, def.col, gagne, txt);
+  if(typeof montrerCombat === 'function') montrerCombat({
+    tuile, att, def, gagne, conquise, debarquement,
+    occAvant, occApres: tuile.occ ? tuile.occ.val : (conquise ? 1 : 0),
+    fortif, nbA: nb, nbD: nbUnites(def.armee) + nbUnites(pertesD),
+    partA: nbUnites(pertesA) / Math.max(1, nb),
+    partD: nbUnites(pertesD) / Math.max(1, nbUnites(def.armee) + nbUnites(pertesD)),
+    verdict: conquise ? 'Province conquise' : gagne ? 'Front avancé' : 'Assaut repoussé',
+    detail: `pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`,
+  });
 
   if(att.joueur || def.joueur){
     const detail = `${debarquement ? 'débarquement · ' : ''}pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`;
@@ -1290,7 +1300,8 @@ function boucle(ts){
   if(!boucle.last) boucle.last = ts;
   const dt = ts - boucle.last; boucle.last = ts;
   if(!S.paused){
-    S.acc += dt * S.speed;
+    // un assaut ne doit pas coûter des mois : le temps du royaume ralentit
+    S.acc += dt * S.speed * (typeof facteurTemps === 'function' ? facteurTemps() : 1);
     while(S.acc >= MS_PAR_MOIS){ S.acc -= MS_PAR_MOIS; tickMois(); }
   }
   dessiner(ts);                 // la carte est animée en continu, même en pause
@@ -1738,6 +1749,11 @@ function texteAide(){
   <div class="grille">
     <div class="bloc"><b>Temps</b><kbd>Espace</kbd> pause/reprise · boutons <kbd>0,5x</kbd> <kbd>1x</kbd> <kbd>2x</kbd> <kbd>4x</kbd>.
       En pause tout s'arrête : tu peux discuter et lever des troupes, rien d'autre.</div>
+    <div class="bloc"><b>${ic('alliance')} Alliances</b>Une alliance se plaide : donne-lui de vraies
+      raisons et le prix baisse. Elle dure <b>${DUREE_ALLIANCE} mois</b>. La rompre avant terme met
+      ta tête à prix : <b>${PRIME_TRAHISON} or</b> à qui t'arrache une province.</div>
+    <div class="bloc"><b>${ic('guerre')} Batailles</b>Une lunette montre chaque assaut qui te concerne,
+      et le temps ralentit le temps de l'action. Un second assaut fait clignoter le cadre.</div>
     <div class="bloc"><b>${ic('batir')} Provinces</b>Une province porte plusieurs ouvrages selon sa
       population et son terrain. Plus elle est <b>dédiée</b> à un même métier, plus elle y rend :
       jusqu'à +45% pour une province entièrement spécialisée.</div>
@@ -1765,6 +1781,12 @@ document.getElementById('btnSave').onclick = ()=> sauvegarder(false);
 document.getElementById('btnLoad').onclick = charger;
 document.getElementById('btnNew').onclick  = ()=> ouvrirAccueil();
 document.getElementById('btnFit').onclick = ()=> toutVoir();
+if(document.getElementById('combatX'))
+  document.getElementById('combatX').onclick = ()=> fermerCombat();
+if(document.getElementById('combatGrand'))
+  document.getElementById('combatGrand').onclick = ()=>{
+    Combat.grand = !Combat.grand; dimensionnerCombat();
+  };
 document.getElementById('btnSave').innerHTML = ic('pacte');
 document.getElementById('btnLoad').innerHTML = ic('coloniser');
 document.getElementById('btnNew').innerHTML  = ic('monde');

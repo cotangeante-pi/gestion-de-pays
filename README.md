@@ -72,6 +72,30 @@ que font les autres nations.
 Un Conseil de la Couronne partage le même moteur et gère ton pays avec toi :
 il diagnostique, projette, classe les actions par rendement et exécute tes ordres.
 
+## Alliances
+
+Une alliance se plaide. Le dirigeant compare ce qu'elle t'apporte à ce qu'elle
+lui apporte ; si le compte penche de ton côté, il chiffre la différence et te
+la fait payer. Six arguments sont reconnus et **vérifiés contre l'état réel du
+monde** — ennemi commun, menace qui pèse sur lui, ta puissance, tes dons passés,
+le commerce ouvert, ta parole tenue. Un argument juste fait baisser le prix, un
+argument faux se fait relever.
+
+Le contrat court 60 mois. Le rompre avant terme effondre ta fiabilité dans
+toutes les cours et met ta tête à prix : **5000 or à qui t'arrache une
+province**, pour la durée qu'il restait au contrat. Les autres nations
+deviennent nettement plus entreprenantes pendant ce temps.
+
+## Batailles
+
+Une lunette de campagne s'ouvre sur chaque assaut qui te concerne : deux lignes
+de bannières de part et d'autre d'un front qui glisse vers sa position réelle,
+les fortifications qui cèdent ou tiennent, les rangs qui s'éclaircissent selon
+les pertes effectives. Rien de sanglant — des enseignes et un front. Le temps du
+royaume ralentit à 12 % pendant l'action : un assaut ne coûte plus des mois de
+règne. Si un second assaut survient pendant que tu regardes, le cadre bat en
+rouge, un carillon discret sonne, et le combat est mis en file.
+
 ## Interface
 
 Une seule interface, de la fenêtre d'un téléphone à un téléviseur : tout est
@@ -100,4 +124,6 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `negociation.js` | propositions structurées, ultimatums, crédibilité |
 | `diplomatie.js` | caractères, mémoire, décisions, répliques |
 | `courrier.js` | veille du monde et correspondance spontanée |
+| `alliance.js` | plaidoirie, contrat daté, prime de trahison |
+| `bataille-ecran.js` | lunette de campagne et ralenti du temps |
 | `conseil.js` | Conseil de la Couronne |
