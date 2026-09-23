@@ -486,12 +486,15 @@ function declarerGuerre(a,b){
   for(const o of S.nations){ if(o!==a && o!==b) o.rel[a.id]-=6; }
   if(a.joueur||b.joueur)
     logue(`${ic('guerre')} <b>${a.nom}</b> déclare la guerre à <b>${b.nom}</b> !`,'bad');
+  else
+    logue(`${ic('guerre')} Au loin : <b>${a.nom}</b> déclare la guerre à <b>${b.nom}</b>.`);
 }
 
 function faireLaPaix(a,b){
   a.guerre.delete(b.id); b.guerre.delete(a.id);
   a.rel[b.id]=clamp(a.rel[b.id]+25,-100,100); b.rel[a.id]=clamp(b.rel[a.id]+25,-100,100);
   if(a.joueur||b.joueur) logue(`${ic('paix')} Paix entre <b>${a.nom}</b> et <b>${b.nom}</b>.`,'good');
+  else logue(`${ic('paix')} Au loin : <b>${a.nom}</b> et <b>${b.nom}</b> font la paix.`);
 }
 
 function bataille(att, def, tuile, frac, debarquement){

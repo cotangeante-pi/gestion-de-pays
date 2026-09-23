@@ -394,3 +394,43 @@ const EXPRESSIONS_DIPLO = [
   [/\bnotre passe\b/g, 'souvenir'], [/\bentre nous\b/g, 'souvenir'],
   [/\bte souviens tu\b/g, 'souvenir'],
 ];
+
+
+/* ===========================================================
+   CONVERSATION ORDINAIRE — on ne parle pas qu'affaires.
+   Sans ces actes, tout ce qui n'était pas une proposition
+   tombait dans « je ne te suis pas ».
+   =========================================================== */
+
+Object.assign(LEX, {
+  projet:{projets:1}, plan:{projets:.8}, intention:{projets:.8}, ambition:{projets:.8},
+  avenir:{projets:.6, futur:.5}, comptes:{projets:.4}, ferastu:{projets:.9},
+  penses2:{opinion:.8, avis:.5}, opinion:{opinion:.9}, jugement:{opinion:.7},
+  demoi:{opinion:1}, memprises:{opinion:.8}, vauxje:{opinion:.9},
+  merci:{gratitude:.9, politesse:.6}, remerci:{gratitude:.9}, reconnaissant:{gratitude:.8},
+  adieu:{adieu:1}, revoir:{adieu:.9}, plustard:{adieu:.6}, quitte:{adieu:.7},
+  bonnejournee:{adieu:.8, politesse:.5}, aplustard:{adieu:.9},
+});
+
+Object.assign(ACTES, {
+  PROJETS:   {projets:1, question:.4},
+  OPINION:   {opinion:1, question:.4},
+  GRATITUDE: {gratitude:1, politesse:.5},
+  ADIEU:     {adieu:1},
+});
+DOMAINES.diplo.push('PROJETS','OPINION','GRATITUDE','ADIEU');
+CLES_LEX = Object.keys(LEX);
+
+EXPRESSIONS_DIPLO.push(
+  [/\bquels? (sont|est) (tes|ton) (projets?|plans?|intentions?|ambitions?)\b/g, 'projet'],
+  [/\bque (comptes|vas) tu faire\b/g, 'ferastu'],
+  [/\bque (penses|pensez) tu de moi\b/g, 'demoi'],
+  // EXPRESSIONS global transforme déjà « que penses-tu » en « avis » : on rattrape
+  [/\bavis (de|sur) moi\b/g, 'demoi'], [/\bavis me\b/g, 'demoi'],
+  [/\bcomment me (vois|juges) tu\b/g, 'demoi'],
+  [/\bque vaut? je\b/g, 'vauxje'],
+  [/\bme prends tu pour\b/g, 'memprises'],
+  [/\bau revoir\b/g, 'revoir'], [/\ba (plus tard|bientot)\b/g, 'aplustard'],
+  [/\bbonne (journee|soiree|chance)\b/g, 'bonnejournee'],
+  [/\bje te (remercie|suis reconnaissant)\b/g, 'remerci'],
+);

@@ -50,6 +50,14 @@ tes menaces passées. Menace sans suite = crédit perdu, et il te le dira.
 pas choisies dans une liste : la justification qu'un dirigeant te donne est bien
 son calcul réel, chiffré.
 
+**Écrire de soi-même.** Chaque dirigeant tient une veille du monde — tes
+provinces, ton armée, tes guerres, les siennes — et t'écrit quand quelque chose
+change : tu as déclaré la guerre à son allié, il perd du terrain, tu armes trop
+vite, son offre expire, tu ne réponds jamais. Une quinzaine de sujets, tirés au
+sort en pondérant par l'urgence, avec une mémoire qui évite les redites. Il te
+pose aussi des questions, te donne des conseils non sollicités et te rapporte ce
+que font les autres nations.
+
 Un Conseil de la Couronne partage le même moteur et gère ton pays avec toi :
 il diagnostique, projette, classe les actions par rendement et exécute tes ordres.
 
@@ -80,4 +88,5 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `marine.js` | portée navale, débarquements, colonisation outre-mer |
 | `negociation.js` | propositions structurées, ultimatums, crédibilité |
 | `diplomatie.js` | caractères, mémoire, décisions, répliques |
+| `courrier.js` | veille du monde et correspondance spontanée |
 | `conseil.js` | Conseil de la Couronne |

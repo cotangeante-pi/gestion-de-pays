@@ -265,6 +265,11 @@ function decider(n, an){
       E.relation = 2 + Math.round(k.chaleur*4); E.humeur = 0.12; return D({issue:'flatte'}); }
     return D({issue:'lasse'});
   }
+  if(an.acte === 'PROJETS')   return D({issue:'projets', alternative: meilleureAlternative(n)});
+  if(an.acte === 'OPINION')   return D({issue:'opinion'});
+  if(an.acte === 'GRATITUDE'){ E.relation = 1 + Math.round(k.chaleur*3); E.humeur = 0.06;
+                               return D({issue:'gratitude'}); }
+  if(an.acte === 'ADIEU')     return D({issue:'adieu'});
   if(an.acte === 'ATTENTE'){
     const alt = meilleureAlternative(n);
     return D({issue:'attente', alternative:alt, prix: alt ? Math.max(0, alt.prixReserve) : 0});
@@ -553,6 +558,46 @@ function replique(n, an, d){
       return choix([`Soit. N'en parlons plus, ${A}.`, `J'oublie. Nous n'avons rien dit.`,
                     `Très bien — rien ne sera engagé.`]);
 
+    case 'projets': {
+      const b = bilan(n), m = mesurer(n);
+      const pire = (m.detail || []).sort((a,c)=>c.part-a.part)[0];
+      const l = [];
+      if(n.guerre.size) l.push(`en finir avec ${[...n.guerre].map(i=>S.nations[i].nom).join(' et ')}`);
+      if(b.net < 2)     l.push(`remplir des caisses qui se vident`);
+      if(b.netFood < 2) l.push(`nourrir mon peuple avant qu'il ne gronde`);
+      if(pire && pire.part > 0.25) l.push(`ne pas me laisser surprendre par ${pire.nation.nom}`);
+      if(!l.length)     l.push(`m'agrandir sans me faire d'ennemis`);
+      let t = `Mes projets, ${A} ? ${majuscule(l[0])}`;
+      if(l[1]) t += `, puis ${l[1]}`;
+      t += `.`;
+      if(d.alternative) t += ` Et si tu veux y avoir une place : `
+        + `${choix(MOTS.objets[d.alternative.action] || ['un accord'])}.`;
+      return fin(t);
+    }
+    case 'opinion': {
+      const r2 = rel(n,p), c = n.croyances, f = Math.round(c.fiabilite*100);
+      const m = n.memoire;
+      const traits = [];
+      if(m.dons > 2)      traits.push(`tu sais être généreux`);
+      if(m.menaces > 1)   traits.push(`tu menaces volontiers`);
+      if(m.trahisons)     traits.push(`tu as trahi, et cela ne s'oublie pas`);
+      if(m.refus > 2)     traits.push(`tu refuses beaucoup`);
+      if(c.menacePercue > 0.6) traits.push(`tu armes plus que de raison`);
+      return fin(`Ce que je pense de toi, ${A} ? `
+        + `${r2 >= 55 ? 'Un ami, et je n\'en ai pas tant.' : r2 >= 15 ? 'Un voisin correct.'
+           : r2 >= -20 ? 'Quelqu\'un que je surveille.' : 'Un adversaire, disons les choses.'} `
+        + `Je te crois fiable à ${f}%${traits.length ? ` — ${traits.slice(0,2).join(', et ')}` : ''}. `
+        + `Ta puissance vaut ${ratioForce(p,n).toFixed(2)} fois la mienne.`);
+    }
+    case 'gratitude':
+      return choix([`On se remercie entre gens qui comptent l'un sur l'autre, ${A}.`,
+                    `Garde tes remerciements pour le jour où j'en aurai vraiment fait beaucoup.`,
+                    `C'est peu de chose. Mais c'est noté.`]);
+    case 'adieu':
+      return choix([`À bientôt, ${A}. Ma porte reste ouverte.`,
+                    `Va. Nous nous reparlerons — le monde est petit.`,
+                    `Adieu pour cette fois, ${A}.`]);
+
     case 'incompris': {
       const noms = {PAIX:'la paix', PACTE:'un pacte', ALLIANCE:'une alliance', COMMERCE:'du commerce',
                     AIDE_GUERRE:'une aide militaire', OFFRE_OR:'un présent', DEMANDE_OR:'un prêt',
@@ -560,10 +605,19 @@ function replique(n, an, d){
                     GUERRE:'la guerre', INSULTE:'une insulte', COMPLIMENT:'un compliment',
                     EXCUSE:'des excuses', SALUT:'un salut', ACCORD:'un accord', REFUS:'un refus',
                     QUESTION:'une question', ATTENTE:'ce que j\'attends de toi',
-                    GUERRES:'mes guerres en cours', RAPPEL:'notre passé commun'};
+                    GUERRES:'mes guerres en cours', RAPPEL:'notre passé commun',
+                    PROJETS:'mes intentions', OPINION:'ce que je pense de toi',
+                    GRATITUDE:'des remerciements', ADIEU:'un au revoir'};
       const l = (d.lectures||[]).map(x=>noms[x]).filter(Boolean);
-      return l.length >= 2 ? `Je ne te suis pas bien, ${A}. Tu me parles de ${l[0]} ou de ${l[1]} ?`
-                           : `Formule cela autrement, ${A} — paix, pacte, alliance, commerce, or, aide ?`;
+      // on ne clôt pas la conversation : on la relance sur ce qui nous intéresse
+      const alt = meilleureAlternative(n);
+      const relance = alt
+        ? ` Ce qui m'intéresserait, en revanche : ${choix(MOTS.objets[alt.action] || ['un accord'])}.`
+        : ` Parle-moi de paix, d'or, de commerce — ou demande-moi ce que je pense de toi.`;
+      if(l.length >= 2) return `Je ne te suis pas bien, ${A}. Tu me parles de ${l[0]} ou de ${l[1]} ?${relance}`;
+      return choix([`Je ne suis pas sûr de comprendre, ${A}.`,
+                    `Voilà qui est obscur, ${A}.`,
+                    `Reformule, veux-tu.`]) + relance;
     }
     default: return `Viens-en au fait, ${A}.`;
   }
@@ -623,38 +677,4 @@ async function envoyerMessage(n, txt){
    LES NATIONS T'ÉCRIVENT D'ELLES-MÊMES
    =========================================================== */
 
-function messagesSpontanes(){
-  const p = S.player;
-  for(const n of S.nations){
-    if(n.joueur || tuilesDe(n).length === 0) continue;
-    if(S.mois - n.memoire.dernierMsg < 8) continue;
-    if(Math.random() > 0.06) continue;
-
-    const k = perso(n), r = rel(n,p), A = appel(n);
-    const alt = meilleureAlternative(n);                 // ce qu'il a le plus intérêt à obtenir
-    const evGuerre = evaluer(n, 'GUERRE', {});
-    const chances = gagneLaGuerre(n, p);
-    let txt = null;
-
-    if(alt && alt.dU > 0.02){
-      const f = (alt.facteurs||[]).filter(x => x.pour !== false)[0];
-      txt = `${majuscule(choix(MOTS.objets[alt.action]))} entre nous : voilà ce que je propose, ${A}.`
-          + (f ? ` ${majuscule(f.texte)}.` : '');
-    } else if(!n.guerre.has(p.id) && evGuerre.dU > -0.01 && chances > 0.62 && k.agressivite > 0.55){
-      const tribut = Math.round(clamp(140 + chances*260, 120, 600)/10)*10;
-      txt = `Mes généraux me donnent ${Math.round(chances*100)} chances sur 100 de t'écraser, ${A}. `
-          + `Un tribut de ${tribut} or les occuperait ailleurs.`;
-    } else if(n.guerre.has(p.id) && chances < 0.4){
-      txt = `Cette guerre me coûte ${coutGuerre(n)} or par mois et je ne la gagne pas. Propose-moi la paix, je l'étudierai.`;
-    } else if(r < -45){
-      txt = `Ma patience a des limites, ${A}. Continue ainsi et mes armées répondront à ta place.`;
-    } else if(n.croyances.menacePercue > 0.6){
-      txt = `Tu armes vite, ${A}. Trop vite. Dis-moi contre qui, avant que je l'imagine moi-même.`;
-    }
-    if(!txt) continue;
-
-    n.memoire.dernierMsg = S.mois;
-    ajouterMsg(n, 'eux', txt);
-    logue(`${ic('pacte')} <b>${n.nom}</b> t'a envoyé un message.`);
-  }
-}
+// messagesSpontanes() vit désormais dans courrier.js
