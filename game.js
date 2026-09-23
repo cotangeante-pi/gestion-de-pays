@@ -407,6 +407,8 @@ function tickMois(){
   }
 
   majOccupations();
+  // disparue de la carte, disparue de la messagerie : ses non-lus ne comptent plus
+  for(const q of S.nations) if(!q.joueur && tuilesDe(q).length === 0 && q.nonLus) q.nonLus = 0;
   for(const q of S.nations) if(!q.joueur && q.croyances) majCroyances(q);
   messagesSpontanes();
   evenementAleatoire();
@@ -940,35 +942,125 @@ function panArmee(){
     const k=b.dataset.sell; p.armee[k]--; p.or += UNITES[k].or*0.35; majUI(); });
 }
 
+/* ===========================================================
+   MESSAGERIE
+   Le panneau se redessinait entièrement à chaque rafraîchissement
+   — donc à chaque mois écoulé. Toutes les bulles rejouaient leur
+   animation d'apparition et le fil sautait en bas : le taux de
+   rafraîchissement se voyait. On ne reconstruit plus que ce qui
+   a réellement changé.
+   =========================================================== */
+
+// les interlocuteurs sont ceux qui existent encore sur la carte
+const nationsSurLaCarte = ()=> S.nations.filter(n => !n.joueur && tuilesDe(n).length > 0);
+
+const ECRIT = '<div class="bulle eux ecrit"><span></span><span></span><span></span></div>';
+const echappe = t => String(t).replace(/</g,'&lt;');
+const bulleHTML = m => `<div class="bulle ${m.de}">${echappe(m.txt).replace(/\n/g,'<br>')}`
+  + `${m.meta ? `<div class="effets">${m.meta.map(echappe).join(' · ')}</div>` : ''}</div>`;
+
+let _rendu = {cle:null, n:0, ecrit:false, entete:'', sugg:''};
+const oublierRendu = ()=> { _rendu = {cle:null, n:0, ecrit:false, entete:'', sugg:''}; };
+
+/* --- rendu d'une conversation, en ne touchant que le nécessaire --- */
+function rendreConversation(el, v){
+  const fil = document.getElementById('fil');
+  const memeFil = _rendu.cle === v.cle && fil && el.contains(fil);
+
+  const brancherSugg = ()=> el.querySelectorAll('[data-sugg]').forEach(b =>
+    b.onclick = ()=> { if(!v.occupe()) v.envoyer(b.dataset.sugg); });
+  const brancherEntete = ()=> {
+    const r = document.getElementById('chatRetour');
+    if(r) r.onclick = ()=>{ S.chatOuvert = null; oublierRendu(); majUI(); };
+  };
+
+  if(!memeFil){
+    // on entre dans la conversation : construction complète
+    el.innerHTML = `<div class="chattete" id="chattete">${v.entete}</div>`
+      + `<div class="fil" id="fil">`
+      + (v.messages.length ? '' : (v.vide || ''))
+      + v.messages.map(bulleHTML).join('')
+      + (v.ecrit ? ECRIT : '')
+      + `</div><div class="suggestions" id="sugg">${v.sugg}</div>`
+      + `<div class="saisie">`
+      + `<input id="chatInput" placeholder="${v.invite}" autocomplete="off">`
+      + `<button class="btn mini" id="chatEnvoi" style="flex:none">${ic('envoyer')}</button></div>`;
+
+    const input = document.getElementById('chatInput');
+    const envoi = ()=>{ const t = input.value.trim();
+                        if(!t || v.occupe()) return; input.value=''; v.envoyer(t); };
+    document.getElementById('chatEnvoi').onclick = envoi;
+    input.onkeydown = e => { if(e.key === 'Enter') envoi(); e.stopPropagation(); };
+    input.onkeyup   = e => e.stopPropagation();
+    brancherEntete(); brancherSugg();
+    const f = document.getElementById('fil'); f.scrollTop = f.scrollHeight;
+  } else {
+    // même conversation : on n'ajoute que ce qui est neuf.
+    // La saisie n'est jamais touchée — le texte, le curseur et le focus survivent.
+    if(v.entete !== _rendu.entete){
+      document.getElementById('chattete').innerHTML = v.entete; brancherEntete();
+    }
+    // le lecteur qui a remonté le fil n'est pas ramené de force en bas
+    const colle = fil.scrollHeight - fil.scrollTop - fil.clientHeight < 40;
+    const ind = fil.querySelector('.bulle.ecrit'); if(ind) ind.remove();
+    const vide = fil.querySelector('.vide');
+    if(vide && v.messages.length) vide.remove();
+    for(let i = _rendu.n; i < v.messages.length; i++)
+      fil.insertAdjacentHTML('beforeend', bulleHTML(v.messages[i]));
+    if(v.ecrit) fil.insertAdjacentHTML('beforeend', ECRIT);
+    if(v.sugg !== _rendu.sugg){
+      document.getElementById('sugg').innerHTML = v.sugg; brancherSugg();
+    }
+    if(colle || v.messages.length > _rendu.n) fil.scrollTop = fil.scrollHeight;
+  }
+  _rendu = {cle:v.cle, n:v.messages.length, ecrit:v.ecrit, entete:v.entete, sugg:v.sugg};
+}
+
+const puces = l => l.map(t=>`<button class="puce" data-sugg="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');
+
 function panChat(){
   const el = document.getElementById('tab-chat');
   const p = S.player;
-  const vivantes = S.nations.filter(n => !n.joueur && tuilesDe(n).length > 0);
+  const vivantes = nationsSurLaCarte();
+
+  // l'interlocuteur a disparu de la carte : on revient à la liste
+  if(S.chatOuvert !== null && S.chatOuvert !== -1){
+    const n0 = S.nations[S.chatOuvert];
+    if(!n0 || tuilesDe(n0).length === 0){ S.chatOuvert = null; oublierRendu(); }
+  }
 
   // ---- liste des conversations ----
   if(S.chatOuvert === null){
     const C = etatConseil();
     const derC = C.chat[C.chat.length-1];
+    // signature : on ne reconstruit la liste que si elle a changé
+    const sig = 'L|' + C.nonLus + '|' + (derC ? derC.txt.length + derC.de : '') + '|'
+      + vivantes.map(n => `${n.id}:${n.nonLus||0}:${Math.round(n.rel[p.id])}:`
+        + `${p.guerre.has(n.id)?'g':p.allies.has(n.id)?'a':''}:`
+        + `${n.chat.length}:${n.chat.length?n.chat[n.chat.length-1].txt.length:0}`).join(',');
+    if(_rendu.cle === sig) return;
+
     let h = `<h3>${ic('chat')} Messages</h3>
       <div class="conv conseil" data-ouvrir="-1">
         <div class="convtete"><b>${ic('ia')} Conseil de la Couronne</b>
           <span>${C.nonLus ? `<span class="badge">${C.nonLus}</span>` : ''}<span class="tag ally">ton pays</span></span></div>
-        <div class="muted convapercu">${derC ? (derC.de==='moi'?'toi : ':'') + derC.txt.slice(0,64).replace(/</g,'&lt;')
+        <div class="muted convapercu">${derC ? (derC.de==='moi'?'toi : ':'') + echappe(derC.txt.slice(0,64))
           : 'gestion, diagnostics, prévisions, ordres — pose-lui n\'importe quelle question'}</div>
       </div>
-      <p class="muted">Parle librement à chaque dirigeant : propose la paix, un pacte, une alliance,
-      de l'or, ou menace-le. Chacun a son caractère et se souvient de tes actes.</p>`;
+      <p class="muted">${vivantes.length} dirigeant${vivantes.length>1?'s':''} sur la carte.
+      Propose la paix, un pacte, une alliance, de l'or, ou menace-les.
+      Chacun a son caractère et se souvient de tes actes.</p>`;
     for(const n of vivantes){
       const der = n.chat[n.chat.length-1];
       const r = Math.round(n.rel[p.id]);
       h += `<div class="conv" data-ouvrir="${n.id}">
         <div class="convtete">
-          <b><i class="flag" style="background:${n.col}"></i>${n.nom}</b>
+          <b><i class="flag" style="background:${n.col}"></i>${echappe(n.nom)}</b>
           <span>${n.nonLus ? `<span class="badge">${n.nonLus}</span>` : ''}
           ${p.guerre.has(n.id)?'<span class="tag war">guerre</span>':p.allies.has(n.id)?'<span class="tag ally">allié</span>':''}</span>
         </div>
-        <div class="muted convapercu">${PERSOS[n.perso].nom} · relation ${r} ·
-          ${der ? (der.de==='moi'?'toi : ':'') + der.txt.slice(0,60).replace(/</g,'&lt;') + (der.txt.length>60?'…':'')
+        <div class="muted convapercu">${PERSOS[n.perso].nom} · ${tuilesDe(n).length} provinces · relation ${r} ·
+          ${der ? (der.de==='moi'?'toi : ':'') + echappe(der.txt.slice(0,60)) + (der.txt.length>60?'…':'')
                 : 'aucun message'}</div>
       </div>`;
     }
@@ -976,81 +1068,48 @@ function panChat(){
     el.querySelectorAll('[data-ouvrir]').forEach(d => d.onclick = ()=>{
       S.chatOuvert = +d.dataset.ouvrir;
       if(S.chatOuvert === -1) etatConseil().nonLus = 0; else S.nations[S.chatOuvert].nonLus = 0;
-      majUI(); });
+      oublierRendu(); majUI(); });
+    _rendu = {cle:sig, n:0, ecrit:false, entete:'', sugg:''};
     return;
   }
 
   // ---- conversation avec le Conseil ----
   if(S.chatOuvert === -1){
     const C = etatConseil(); C.nonLus = 0;
-    const champ0 = document.getElementById('chatInput');
-    const val0 = champ0 ? champ0.value : '', foc0 = champ0 ? document.activeElement === champ0 : false;
     const b = bilan(p);
-    let hc = `<div class="chattete">
-        <button class="btn mini" id="chatRetour" style="flex:none">←</button>
-        <div><b>${ic('ia')} Conseil de la Couronne</b>
-          <div class="muted">${Math.round(p.or)} or · ${Math.round(p.nourriture)} vivres · bonheur ${Math.round(p.bonheur)} · ${b.nb} provinces</div></div>
-      </div><div class="fil" id="fil">`;
-    if(!C.chat.length) hc += `<div class="bulle eux">Je suis ton conseil, ${p.nom}. Demande-moi l'état du royaume,
-      pourquoi un chiffre baisse, ce qu'il faut faire en priorité, où bâtir, ce que coûte une unité,
-      si tu peux l'emporter contre un voisin — ou donne-moi un ordre : je l'exécute.</div>`;
-    for(const m of C.chat)
-      hc += `<div class="bulle ${m.de}">${m.txt.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
-    if(C.ecrit) hc += `<div class="bulle eux ecrit"><span></span><span></span><span></span></div>`;
-    hc += `</div>`;
-
-    const s2 = ['Que dois-je faire en priorité ?', 'Rapport complet.',
-                p.bonheur < 55 ? 'Pourquoi mon peuple est-il mécontent ?' : 'Pourquoi mon trésor évolue ainsi ?',
-                'Où construire une ferme ?', 'Où en serai-je dans 24 mois ?'];
+    const sugg = [];
+    sugg.push('Que dois-je faire en priorité ?', 'Rapport complet.',
+      p.bonheur < 55 ? 'Pourquoi mon peuple est-il mécontent ?' : 'Pourquoi mon trésor évolue ainsi ?',
+      'Où construire une ferme ?', 'Où en serai-je dans 24 mois ?');
     const ennemi = [...p.guerre].map(i=>S.nations[i]).filter(o=>tuilesDe(o).length)[0]
-                || S.nations.find(o=>!o.joueur && tuilesDe(o).length);
-    if(ennemi) s2.push(`Puis-je battre ${ennemi.nom} ?`);
-    hc += `<div class="suggestions">${s2.map(t=>`<button class="puce" data-sugg="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('')}</div>
-      <div class="saisie">
-        <input id="chatInput" placeholder="Parle à ton conseil…" autocomplete="off">
-        <button class="btn mini" id="chatEnvoi" style="flex:none">${ic('envoyer')}</button>
-      </div>`;
-    el.innerHTML = hc;
-    const fil0 = document.getElementById('fil'); fil0.scrollTop = fil0.scrollHeight;
-    const in0 = document.getElementById('chatInput');
-    in0.value = val0;
-    if(foc0){ in0.focus(); in0.setSelectionRange(val0.length, val0.length); }
-    const env0 = ()=>{ const t = in0.value.trim(); if(!t || C.ecrit) return; in0.value=''; envoyerAuConseil(t); };
-    document.getElementById('chatEnvoi').onclick = env0;
-    in0.onkeydown = e => { if(e.key === 'Enter') env0(); e.stopPropagation(); };
-    in0.onkeyup = e => e.stopPropagation();
-    document.getElementById('chatRetour').onclick = ()=>{ S.chatOuvert = null; majUI(); };
-    el.querySelectorAll('[data-sugg]').forEach(b2 => b2.onclick = ()=>{ if(!C.ecrit) envoyerAuConseil(b2.dataset.sugg); });
+                || vivantes[0];
+    if(ennemi) sugg.push(`Puis-je battre ${ennemi.nom} ?`);
+
+    rendreConversation(el, {
+      cle: 'C',
+      entete: `<button class="btn mini" id="chatRetour" style="flex:none">←</button>
+        <div><b>${ic('ia')} Conseil de la Couronne</b>
+          <div class="muted">${Math.round(p.or)} or · ${Math.round(p.nourriture)} vivres · `
+        + `bonheur ${Math.round(p.bonheur)} · ${b.nb} provinces</div></div>`,
+      messages: C.chat,
+      ecrit: !!C.ecrit,
+      sugg: puces(sugg),
+      invite: 'Parle à ton conseil…',
+      vide: `<div class="bulle eux vide">Je suis ton conseil, ${echappe(p.nom)}. Demande-moi l'état du royaume,
+        pourquoi un chiffre baisse, ce qu'il faut faire en priorité, où bâtir, ce que coûte une unité,
+        si tu peux l'emporter contre un voisin — ou donne-moi un ordre : je l'exécute.</div>`,
+      occupe: ()=> !!C.ecrit,
+      envoyer: t => envoyerAuConseil(t),
+    });
     return;
   }
 
   // ---- conversation avec une nation ----
   const n = S.nations[S.chatOuvert];
   n.nonLus = 0;
-  const champ = document.getElementById('chatInput');
-  const valeur = champ ? champ.value : '';
-  const focus  = champ ? document.activeElement === champ : false;
-
   const r = Math.round(n.rel[p.id]);
   const humeur = n.humeur > 0.65 ? 'de bonne humeur' : n.humeur < 0.3 ? 'de mauvaise humeur' : 'neutre';
-  let h = `<div class="chattete">
-      <button class="btn mini" id="chatRetour" style="flex:none">←</button>
-      <div><b><i class="flag" style="background:${n.col}"></i>${n.nom}</b>
-        <div class="muted">${PERSOS[n.perso].nom} · ${humeur} · relation ${r}
-          ${p.guerre.has(n.id)?'<span class="tag war">guerre</span>':''}
-          ${p.allies.has(n.id)?'<span class="tag ally">allié</span>':p.pacte.has(n.id)?'<span class="tag">pacte</span>':''}
-          ${p.commerce && p.commerce.has(n.id)?'<span class="tag">commerce</span>':''}
-          ${n.negociation && S.mois-n.negociation.mois<=8 ? `<span class="tag nego">offre : ${n.negociation.demande} or</span>`:''}</div></div>
-    </div>
-    <div class="fil" id="fil">`;
-  for(const m of n.chat){
-    h += `<div class="bulle ${m.de}">${m.txt.replace(/</g,'&lt;').replace(/\n/g,'<br>')}
-      ${m.meta ? `<div class="effets">${m.meta.join(' · ')}</div>` : ''}</div>`;
-  }
-  if(n.ecrit) h += `<div class="bulle eux ecrit"><span></span><span></span><span></span></div>`;
-  h += `</div>`;
 
-  // suggestions contextuelles
   const sugg = [];
   if(n.negociation && S.mois-n.negociation.mois<=8){
     sugg.push('D\'accord, marché conclu.');
@@ -1062,43 +1121,35 @@ function panChat(){
   if(r > 40 && !p.allies.has(n.id)) sugg.push('Concluons une alliance.');
   if(!p.guerre.has(n.id)) sugg.push('Ouvrons une route commerciale.');
   if(p.or >= 150) sugg.push('Je te donne 150 or en gage d\'amitié.');
-  sugg.push('Comment va ton pays ?');
-  const autre = S.nations.find(o => o !== n && !o.joueur && tuilesDe(o).length && p.guerre.has(o.id));
+  sugg.push('Comment va ton pays ?', 'Que veux-tu de moi ?');
+  const autre = vivantes.find(o => o !== n && p.guerre.has(o.id));
   if(autre) sugg.push(`Aide-moi dans ma guerre contre ${autre.nom}.`);
 
-  h += `<div class="suggestions">${sugg.map(t=>`<button class="puce" data-sugg="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('')}</div>
-    <div class="saisie">
-      <input id="chatInput" placeholder="Écris à ${n.nom}…" autocomplete="off">
-      <button class="btn mini" id="chatEnvoi" style="flex:none">${ic('envoyer')}</button>
-    </div>`;
-  el.innerHTML = h;
-
-  const fil = document.getElementById('fil');
-  fil.scrollTop = fil.scrollHeight;
-  const input = document.getElementById('chatInput');
-  input.value = valeur;
-  if(focus){ input.focus(); input.setSelectionRange(valeur.length, valeur.length); }
-
-  const envoi = ()=>{
-    const t = input.value.trim();
-    if(!t || n.ecrit) return;
-    input.value = '';
-    envoyerMessage(n, t);
-  };
-  document.getElementById('chatEnvoi').onclick = envoi;
-  input.onkeydown = e => { if(e.key === 'Enter') envoi(); e.stopPropagation(); };
-  input.onkeyup = e => e.stopPropagation();
-  document.getElementById('chatRetour').onclick = ()=>{ S.chatOuvert = null; majUI(); };
-  el.querySelectorAll('[data-sugg]').forEach(b => b.onclick = ()=>{
-    if(n.ecrit) return;
-    envoyerMessage(n, b.dataset.sugg);
+  rendreConversation(el, {
+    cle: 'N' + n.id,
+    entete: `<button class="btn mini" id="chatRetour" style="flex:none">←</button>
+      <div><b><i class="flag" style="background:${n.col}"></i>${echappe(n.nom)}</b>
+        <div class="muted">${PERSOS[n.perso].nom} · ${humeur} · ${tuilesDe(n).length} provinces · relation ${r}
+          ${p.guerre.has(n.id)?'<span class="tag war">guerre</span>':''}
+          ${p.allies.has(n.id)?'<span class="tag ally">allié</span>':p.pacte.has(n.id)?'<span class="tag">pacte</span>':''}
+          ${p.commerce && p.commerce.has(n.id)?'<span class="tag">commerce</span>':''}
+          ${n.negociation && S.mois-n.negociation.mois<=8 ? `<span class="tag nego">offre : ${n.negociation.demande} or</span>`:''}</div></div>`,
+    messages: n.chat,
+    ecrit: !!n.ecrit,
+    sugg: puces(sugg),
+    invite: `Écris à ${echappe(n.nom)}…`,
+    vide: '',
+    occupe: ()=> !!n.ecrit,
+    envoyer: t => envoyerMessage(n, t),
   });
 }
 
 function majBadgeChat(){
   const t = document.getElementById('tabChat');
   if(!t) return;
-  const total = S.nations.reduce((s,n)=> s + (n.joueur?0:(n.nonLus||0)), 0) + (S.conseil?.nonLus||0);
+  // une nation disparue de la carte ne figure plus dans la liste : elle ne doit
+  // pas non plus peser dans le compteur, sinon le chiffre ne correspond à rien
+  const total = nationsSurLaCarte().reduce((s,n)=> s + (n.nonLus||0), 0) + (S.conseil?.nonLus||0);
   t.classList.toggle('anonlus', total > 0);
   t.dataset.nonlus = total > 9 ? '9+' : (total || '');
 }
@@ -1428,6 +1479,7 @@ function appliquerSauvegarde(d){
   }
   Object.assign(S.cam, d.cam);
   S.chatOuvert = null;
+  if(typeof oublierRendu === 'function') oublierRendu();
   S.log = Array.isArray(d.log) ? d.log : [];
   S.conseil = {chat:(d.conseil && d.conseil.chat) || [], nonLus:0, proposition:null};
 }
@@ -1440,6 +1492,7 @@ function nouvellePartie(){
     S.mois = 0; S.acc = 0;
     S.log = [];                 // la chronique du règne précédent ne déborde pas sur le nouveau
     S.conseil = null;           // ni la conversation du Conseil, ni son contexte
+    S.chatOuvert = null; oublierRendu();
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
     logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`
