@@ -148,7 +148,7 @@ const COULEURS = ['#e05252','#e0a63a','#8e5ce0','#25b0a0','#d9569b','#5d7ce0',
 const S = {
   tiles:new Map(), nations:[], player:null, sel:null,
   mois:0, paused:true, speed:1, acc:0, log:[],
-  cam:{x:0,y:0,z:1}, tab:'province', chatOuvert:null,
+  cam:{x:0,y:0,z:1}, tab:'province', chatOuvert:null, prime:null,
 };
 
 const key = (q,r)=>q+','+r;
@@ -428,6 +428,7 @@ function texteArmee(a){
 function tickMois(){
   S.mois++;
   if(typeof suivreMenaces === 'function') suivreMenaces();
+  if(typeof suivreAlliances === 'function') suivreAlliances();
   for(const n of S.nations){
     if(tuilesDe(n).length===0) continue;
     const b = bilan(n);
@@ -527,10 +528,13 @@ function iaJoue(n, b){
     else n.rel[o.id] = clamp(n.rel[o.id] + (Math.random()<0.5?1:-0.5), -100, 100);
   }
   // déclarer la guerre
-  if(Math.random()<0.012*n.agressivite*3){
+  const appat = (typeof primeActive === 'function' && primeActive()) ? 3.5 : 1;
+  if(Math.random()<0.012*n.agressivite*3*appat){
     const cibles = S.nations.filter(o=>o!==n && o.id!==undefined
       && !n.guerre.has(o.id) && !n.allies.has(o.id) && !n.pacte.has(o.id)
-      && tuilesDe(o).length>0 && n.rel[o.id]<10 && puissance(n)>puissance(o)*1.2);
+      && tuilesDe(o).length>0
+      && (n.rel[o.id]<10 || (o.joueur && appat>1))          // la prime fait oublier les bonnes manières
+      && puissance(n)>puissance(o)*(o.joueur && appat>1 ? 0.85 : 1.2));
     if(cibles.length){ declarerGuerre(n, pick(cibles)); }
   }
   // attaquer
@@ -552,6 +556,8 @@ function iaJoue(n, b){
 
 function declarerGuerre(a,b){
   // rompre un pacte est une trahison : la nouvelle se répand
+  if(a.joueur && b.allies && b.allies.has(a.id) && typeof romprAlliance === 'function')
+    romprAlliance(b, true);              // met ta tête à prix
   if(a.joueur && b.pacte && b.pacte.has(a.id) && typeof signalerTrahison === 'function') signalerTrahison(b);
   a.guerre.add(b.id); b.guerre.add(a.id);
   a.allies.delete(b.id); b.allies.delete(a.id);
@@ -604,8 +610,14 @@ function bataille(att, def, tuile, frac, debarquement){
 
   let txt, conquise = false;
   if(tuile.occ.val >= 1){
+    const etaitAuJoueur = def.joueur;
     tuile.owner = att.id; tuile.pop *= 0.85; tuile.fort = 0; tuile.occ = null;
     if(typeof oublierMer === 'function') oublierMer();   // les côtes ont changé de main
+    // prime de trahison : le monde paie qui t'arrache une terre
+    if(etaitAuJoueur && !att.joueur && typeof primeActive === 'function' && primeActive()){
+      att.or += S.prime.montant;
+      logue(`${ic('or')} <b>${att.nom}</b> touche ${S.prime.montant} or de prime pour cette province.`, 'bad');
+    }
     txt = 'Province conquise'; conquise = true;
   } else {
     const pc = Math.round(tuile.occ.val*100);
@@ -713,7 +725,10 @@ document.querySelectorAll('.tab').forEach(b=>
 function majBarre(){
   const p = S.player, b = bilan(p);
   const d = v => `<i class="delta" style="color:${v>=0?'#4ad991':'#ff6b6b'}">${v>=0?'+':''}${v.toFixed(1)}</i>`;
-  document.getElementById('resBar').innerHTML = `
+  const prime = (typeof primeActive === 'function' && primeActive())
+    ? `<span class="tag war" title="Tu as rompu une alliance avant son terme : chaque province qu'on te prend rapporte ${S.prime.montant} or à son vainqueur">`
+      + `${ic('guerre')} Tête mise à prix · ${primeReste()} mois</span>` : '';
+  document.getElementById('resBar').innerHTML = prime + `
     <span title="Trésor national">${ic('or')} <b>${fmt(p.or)}</b> ${d(b.net)}</span>
     <span title="Matériaux de construction">${ic('mat')} <b>${fmt(p.mat)}</b> ${d(b.mat)}</span>
     <span title="Réserves de nourriture">${ic('food')} <b>${fmt(p.nourriture)}</b> ${d(b.netFood)}</span>
@@ -1236,7 +1251,7 @@ function panChat(){
       <div><b><i class="flag" style="background:${n.col}"></i>${echappe(n.nom)}</b>
         <div class="muted">${PERSOS[n.perso].nom} · ${humeur} · ${tuilesDe(n).length} provinces · relation ${r}
           ${p.guerre.has(n.id)?'<span class="tag war">guerre</span>':''}
-          ${p.allies.has(n.id)?'<span class="tag ally">allié</span>':p.pacte.has(n.id)?'<span class="tag">pacte</span>':''}
+          ${p.allies.has(n.id)?`<span class="tag ally">allié${(typeof contratAlliance==='function'&&contratAlliance(n))?` · ${contratAlliance(n).reste} mois`:''}</span>`:p.pacte.has(n.id)?'<span class="tag">pacte</span>':''}
           ${p.commerce && p.commerce.has(n.id)?'<span class="tag">commerce</span>':''}
           ${n.negociation && S.mois-n.negociation.mois<=8 ? `<span class="tag nego">offre : ${n.negociation.demande} or</span>`:''}</div></div>`,
     messages: n.chat,
@@ -1536,9 +1551,11 @@ function sauvegarder(auto){
         memoire:n.memoire ? {...n.memoire} : null, chat:(n.chat||[]).slice(-40), nonLus:n.nonLus||0,
         croyances:n.croyances ? {...n.croyances} : null, negociation:n.negociation || null,
         confirmation:n.confirmation || null, menaceEnCours:n.menaceEnCours || null,
+        allianceJusqu:n.allianceJusqu || null, allianceDebut:n.allianceDebut || null,
         capitale: n.capitale ? key(n.capitale.q, n.capitale.r) : null,
       })),
       conseil: S.conseil ? {chat:S.conseil.chat.slice(-30)} : null,
+      prime: S.prime || null,
       log: S.log.slice(-150),
       tiles: [...S.tiles.values()].map(t=>({
         q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:+t.pop.toFixed(2),
@@ -1588,6 +1605,7 @@ function appliquerSauvegarde(d){
   S.chatOuvert = null;
   if(typeof oublierRendu === 'function') oublierRendu();
   S.log = Array.isArray(d.log) ? d.log : [];
+  S.prime = d.prime || null;
   S.conseil = {chat:(d.conseil && d.conseil.chat) || [], nonLus:0, proposition:null};
 }
 
@@ -1599,7 +1617,7 @@ function nouvellePartie(){
     S.mois = 0; S.acc = 0;
     S.log = [];                 // la chronique du règne précédent ne déborde pas sur le nouveau
     S.conseil = null;           // ni la conversation du Conseil, ni son contexte
-    S.chatOuvert = null; oublierRendu();
+    S.chatOuvert = null; oublierRendu(); S.prime = null;
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
     logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`

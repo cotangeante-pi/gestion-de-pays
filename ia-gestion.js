@@ -579,3 +579,19 @@ Object.assign(LEX, {
   usin:{batir:.5, argent:.6, industrie:.8},     // ← usine
 });
 CLES_LEX = Object.keys(LEX);
+
+
+/* --- rompre une alliance se dit, et se paie --- */
+Object.assign(LEX, {
+  romp:{rupture:1}, rupture9:{rupture:1}, quitt:{rupture:.6},
+  resili:{rupture:.8}, annuleall:{rupture:.9}, fini9:{rupture:.5},
+});
+Object.assign(ACTES, {RUPTURE_ALLIANCE:{rupture:1, union:.3}});
+DOMAINES.diplo.push('RUPTURE_ALLIANCE');
+CLES_LEX = Object.keys(LEX);
+EXPRESSIONS_DIPLO.push(
+  [/\bje (romps|rompt|brise|annule|resilie)( notre)? (l )?alliance\b/g, 'rupture9'],
+  [/\bnotre alliance est (finie|rompue|terminee)\b/g, 'rupture9'],
+  [/\bje quitte (notre|l ) ?alliance\b/g, 'rupture9'],
+  [/\bfin de (notre|l ) ?alliance\b/g, 'rupture9'],
+);

@@ -168,6 +168,23 @@ function decider(n, an){
     if(action === 'AIDE_GUERRE' && an.cible && n.guerre.has(an.cible.id))
       return D({issue:'sansObjet', action, quoi:'guerre déjà déclarée'});
 
+    // --- l'alliance est un contrat : elle se plaide, se chiffre et se date ---
+    if(action === 'ALLIANCE' && r >= 15 && n.croyances.fiabilite >= 0.35
+       && typeof chiffrerAlliance === 'function'){
+      const c = chiffrerAlliance(n, an);
+      const offert = an.acte === 'CONDITION' ? clamp(an.montant||0, 0, Math.floor(p.or)) : 0;
+      if(c.prix <= offert || c.prix === 0){
+        if(offert) E.donJoueur = offert;
+        E.alliance = true; E.relation = 8;
+        return D({issue:'allianceConclue', action, prix:offert, duree:DUREE_ALLIANCE, chiffrage:c});
+      }
+      if(c.prix > Math.max(600, p.or*2))
+        return D({issue:'allianceTropChere', action, chiffrage:c});
+      n.negociation = {action:'ALLIANCE', demande:c.prix, reserve:Math.round(c.prix*0.55),
+                       mois:S.mois, concessions:0};
+      return D({issue:'alliancePrix', action, prix:c.prix, chiffrage:c});
+    }
+
     // garde-fous de confiance : l'utilité ne suffit pas à sceller un serment
     if(action === 'ALLIANCE' && (r < 15 || n.croyances.fiabilite < 0.35))
       return D({issue:'refuseConfiance', action, manque: Math.max(0, Math.round(15-r)),
@@ -267,6 +284,11 @@ function decider(n, an){
     return D({issue:'lasse'});
   }
   /* --- dix familles de plus --- */
+  if(an.acte === 'RUPTURE_ALLIANCE'){
+    if(!n.allies.has(p.id)) return D({issue:'sansObjet', quoi:'alliance à rompre'});
+    if(typeof romprAlliance === 'function') romprAlliance(n, true);
+    return D({issue:'allianceRompue'});
+  }
   if(an.acte === 'PROMESSE'){
     E.relation = 2 + Math.round(k.chaleur*3); E.humeur = 0.08;
     return D({issue:'promesse'});
@@ -402,7 +424,9 @@ function appliquer(n, d){
   if(E.pacte){ p.pacte.add(n.id); n.pacte.add(p.id);
                n.rel[p.id] = clamp(n.rel[p.id]+8,-100,100); maj.push('pacte de non-agression'); }
   if(E.alliance){ p.allies.add(n.id); n.allies.add(p.id); p.pacte.add(n.id); n.pacte.add(p.id);
-                  n.rel[p.id] = clamp(n.rel[p.id]+12,-100,100); maj.push('alliance conclue'); }
+                  n.rel[p.id] = clamp(n.rel[p.id]+12,-100,100);
+                  if(typeof ouvrirAlliance === 'function') ouvrirAlliance(n);
+                  maj.push(`alliance pour ${DUREE_ALLIANCE} mois`); }
   if(E.commerce){ (p.commerce ||= new Set()).add(n.id); (n.commerce ||= new Set()).add(p.id);
                   maj.push('accord commercial'); }
   if(E.guerre){ declarerGuerre(n, p); n.memoire.debutGuerre = S.mois; maj.push('GUERRE'); }
@@ -683,6 +707,41 @@ function replique(n, an, d){
       return rel(n,p) > 35
         ? `Traverse mes terres si tu veux, ${A} — mais que tes hommes se tiennent.`
         : `Mes routes ne sont pas les tiennes, ${A}. Signe d'abord quelque chose avec moi.`;
+
+    case 'allianceConclue': {
+      const c = d.chiffrage;
+      let t = `${majuscule(choix(MOTS.accepte[reg]))} cette alliance, ${A} — `
+            + `pour ${d.duree} mois, terme sur lequel je ne reviendrai pas.`;
+      if(c.plaid.retenus.length)
+        t += ` Tu as plaidé juste : ${c.plaid.retenus[0].texte}.`;
+      if(d.prix) t += ` Tes ${d.prix} or scellent l'affaire.`;
+      t += ` Romps-la avant terme et le monde entier saura ce que vaut ta parole.`;
+      return t;
+    }
+    case 'alliancePrix': {
+      const c = d.chiffrage;
+      let t = `Une alliance, ${A} ? Regardons les comptes. `;
+      t += c.desequilibre > 0.25
+        ? `Elle te sert plus qu'elle ne me sert : ma puissance t'apporterait `
+          + `${c.pourToi.toFixed(2)}, la tienne ne m'apporte que ${c.pourLui.toFixed(2)}. `
+        : `Elle ne m'avance pas assez pour que je m'engage gratuitement. `;
+      if(c.plaid.retenus.length)
+        t += `Tu as raison sur un point — ${c.plaid.retenus[0].texte} — et j'en ai tenu compte. `;
+      if(c.plaid.rejetes.length)
+        t += `En revanche, ${c.plaid.rejetes[0].texte}. `;
+      t += `${d.prix} or, et je signe pour ${DUREE_ALLIANCE} mois. `
+        + `Plaide mieux si tu veux faire baisser ce chiffre.`;
+      return t;
+    }
+    case 'allianceTropChere': {
+      const c = d.chiffrage;
+      return `Non, ${A}. Il faudrait ${c.prix} or pour m'y décider, et ni toi ni moi `
+        + `n'avons cela. ${c.plaid.rejetes.length ? majuscule(c.plaid.rejetes[0].texte) + '.' : ''} `
+        + `Reviens quand nos intérêts se ressembleront davantage.`;
+    }
+    case 'allianceRompue':
+      return `Tu romps ton serment, ${A}. Soit. `
+        + `${PRIME_TRAHISON} or à qui te prendra une province — je m'en assurerai personnellement.`;
 
     case 'projets': {
       const b = bilan(n), m = mesurer(n);
