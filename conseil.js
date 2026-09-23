@@ -856,7 +856,7 @@ function repDiploEtat(an){
     return `${cible.nom} : vous êtes ${lien}, relation ${Math.round(r)}/100. `
       + `Puissance ${puissance(cible).toFixed(0)} contre ${puissance(p).toFixed(0)} pour toi `
       + `(${ratioForce(cible,p).toFixed(2)}×)${frontiereCommune(p,cible)?', et vous partagez une frontière':', sans frontière commune'}. `
-      + `Ils sont dirigés par un ${PERSOS[cible.perso].nom.toLowerCase()}${cible.guerre.size?`, déjà en guerre contre ${[...cible.guerre].map(i=>S.nations[i].nom).join(', ')}`:', en paix avec tout le monde'}.`;
+      + `Ils sont dirigés par un ${PERSOS[cible.perso].nom.toLowerCase()}${cible.guerre.size?`, déjà en guerre contre ${[...cible.guerre].map(i=>S.nations[i]).map(o=>o.joueur?'toi':o.nom).join(', ')}`:', en paix avec tout le monde'}.`;
   }
   const nom = i => S.nations[i].nom;
   const l = [];

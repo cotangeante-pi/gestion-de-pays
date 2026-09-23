@@ -228,11 +228,11 @@ const SUJETS = [
     const A = appel(n);
     if(allies.length && Math.random() < 0.5)
       return {sujet:'nouvellesAlliance', prio:2,
-        txt:`${allies.map(o=>o.nom).join(' et ')} ${allies.length>1?'marchent':'marche'} désormais `
+        txt:`${nommerTous(allies)} ${allies.length>1?'marchent':'marche'} désormais `
           + `à mes côtés, ${A}. Le monde se partage en camps — le tien reste à choisir.`};
     if(enGuerre.length)
       return {sujet:'nouvellesGuerre', prio:3,
-        txt:`Je me bats contre ${enGuerre.map(o=>o.nom).join(' et ')}. `
+        txt:`Je me bats contre ${nommerTous(enGuerre)}. `
           + `Pendant ce temps mes frontières avec toi sont dégarnies, ${A} — `
           + `j'espère que tu es l'homme que je crois.`};
     const fort = autres.sort((a,b)=>puissance(b)-puissance(a))[0];

@@ -36,6 +36,12 @@ function initDiplomatie(n, i){
 const perso = n => PERSOS[n.perso] || PERSOS.prudent;
 const fmtSigne = x => (x>=0?'+':'') + Math.round(x*10)/10;
 
+/* Dans la bouche d'un dirigeant, le joueur est « toi » — jamais le nom de son
+   pays. Sans cela, une conversation intitulée « Ryukan » annonçait « en guerre
+   contre Lysandre », et ton propre royaume se lisait comme un tiers. */
+const nommer = o => (o && o.joueur) ? 'toi' : (o ? o.nom : '?');
+const nommerTous = l => l.map(nommer).join(' et ');
+
 /* ---------- utilitaires de conversation ---------- */
 function ajouterMsg(n, de, txt, meta){
   n.chat.push({de, txt, mois:S.mois, meta:meta||null});
@@ -528,9 +534,9 @@ function replique(n, an, d){
       const pires = m.detail.sort((a,c)=>c.part-a.part)[0];
       return `${n.nom} : ${pr} provinces, ${b.pop.toFixed(0)}k âmes, ${nbUnites(n.armee)} unités, `
         + `${Math.round(n.or)} or en caisse (${b.net >= 0 ? '+' : ''}${b.net.toFixed(0)}/mois). `
-        + (n.guerre.size ? `En guerre contre ${[...n.guerre].map(i=>S.nations[i].nom).join(' et ')}, ce qui me coûte ${coutGuerre(n)} or par mois. `
+        + (n.guerre.size ? `En guerre contre ${nommerTous([...n.guerre].map(i=>S.nations[i]))}, ce qui me coûte ${coutGuerre(n)} or par mois. `
                          : `En paix. `)
-        + (pires && pires.part > 0.2 ? `Ce qui m'inquiète le plus : ${pires.nation.nom}. ` : '')
+        + (pires && pires.part > 0.2 ? `Ce qui m'inquiète le plus : ${nommer(pires.nation)}. ` : '')
         + `Envers toi : ${rel(n,p) >= 55 ? 'de l\'amitié' : rel(n,p) >= 15 ? 'de la cordialité'
             : rel(n,p) >= -20 ? 'de la méfiance' : 'de l\'hostilité'} (${Math.round(rel(n,p))}), `
         + `et je te crois fiable à ${Math.round(n.croyances.fiabilite*100)}%.`;
@@ -560,14 +566,14 @@ function replique(n, an, d){
       const g = [...n.guerre].map(i=>S.nations[i]).filter(o=>tuilesDe(o).length);
       const al = [...n.allies].map(i=>S.nations[i]);
       if(!g.length)
-        return `Aucune guerre, ${A}. ${al.length ? `Je marche aux côtés de ${al.map(o=>o.nom).join(' et ')}.`
+        return `Aucune guerre, ${A}. ${al.length ? `Je marche aux côtés de ${nommerTous(al)}.`
                 : `Et je compte bien que cela dure.`}`;
       const c = coutGuerre(n);
-      return `Je suis en guerre contre ${g.map(o=>`${o.nom} (${gagneLaGuerre(n,o) >= 0.5
+      return `Je suis en guerre contre ${g.map(o=>`${nommer(o)} (${gagneLaGuerre(n,o) >= 0.5
           ? `je nous donne ${Math.round(gagneLaGuerre(n,o)*100)} chances sur 100`
           : `${Math.round(gagneLaGuerre(n,o)*100)} chances sur 100 seulement`})`).join(', ')}. `
         + `Cela me coûte ${c} or chaque mois. `
-        + (al.length ? `${al.map(o=>o.nom).join(' et ')} ${al.length>1?'sont mes alliés':'est mon allié'}.`
+        + (al.length ? `${nommerTous(al)} ${al.length>1?'sont mes alliés':'est mon allié'}.`
                      : `Et je me bats seul.`);
     }
     case 'rappel': {
@@ -762,10 +768,10 @@ function replique(n, an, d){
       const b = bilan(n), m = mesurer(n);
       const pire = (m.detail || []).sort((a,c)=>c.part-a.part)[0];
       const l = [];
-      if(n.guerre.size) l.push(`en finir avec ${[...n.guerre].map(i=>S.nations[i].nom).join(' et ')}`);
+      if(n.guerre.size) l.push(`en finir avec ${nommerTous([...n.guerre].map(i=>S.nations[i]))}`);
       if(b.net < 2)     l.push(`remplir des caisses qui se vident`);
       if(b.netFood < 2) l.push(`nourrir mon peuple avant qu'il ne gronde`);
-      if(pire && pire.part > 0.25) l.push(`ne pas me laisser surprendre par ${pire.nation.nom}`);
+      if(pire && pire.part > 0.25) l.push(`ne pas me laisser surprendre par ${nommer(pire.nation)}`);
       if(!l.length)     l.push(`m'agrandir sans me faire d'ennemis`);
       let t = `Mes projets, ${A} ? ${majuscule(l[0])}`;
       if(l[1]) t += `, puis ${l[1]}`;

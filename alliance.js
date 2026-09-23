@@ -100,7 +100,7 @@ const ARGUMENTS = [
      const m = mesurer(n);
      const pire = (m.detail||[]).filter(x => x.nation !== S.player).sort((a,b)=>b.part-a.part)[0];
      return pire && pire.part > 0.25
-       ? {vrai:true, poids:0.40, texte:`${pire.nation.nom} me pèse, c'est vrai`}
+       ? {vrai:true, poids:0.40, texte:`${nommer(pire.nation)} me pèse, c'est vrai`}
        : {vrai:false, texte:`personne ne me menace assez pour que je paie ta protection`};
    }},
   {cle:'force', motif:/\b(je suis (fort|puissant)|ma puissance|mon armee|mes troupes|je vaux)\b/,
