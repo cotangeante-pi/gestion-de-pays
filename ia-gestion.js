@@ -299,6 +299,11 @@ function cascadeConseil(base, slots, G){
 
   // --- 2. familles de questions restantes ---
   else if(G('classer') > .5)               { acte='G_CLASSER';    regle='superlatif'; }
+  // « attaque Kesmir » est un ordre, pas une question : il passe avant la comparaison.
+  // Sans cette règle, la correction de « quelles sont nos chances contre X » avalait
+  // aussi les ordres d'assaut.
+  else if(slots.cible && G('guerre') > .55 && !interro && G('comparer') < .4)
+                                           { acte='G_ATTAQUER';   regle='assaut ordonné sur une nation nommée'; }
   // une nation nommée + une idée de force : c'est une comparaison, pas un catalogue
   else if(slots.cible && (G('comparer') > .3 || G('guerre') > .3 || G('force') > .4))
                                            { acte='G_COMPARER';   regle='comparaison avec une nation nommée'; }

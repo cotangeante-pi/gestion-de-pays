@@ -1051,6 +1051,10 @@ function ordreAttaquer(an){
     if(!g.length) return `Tu n'es en guerre contre personne. Déclare d'abord la guerre depuis l'onglet Diplomatie.`;
     ennemi = g[0];
   }
+  // on ne parle de portée qu'à un ennemi déclaré : sinon on répond à côté
+  if(!p.guerre.has(ennemi.id))
+    return `Nous ne sommes pas en guerre contre ${ennemi.nom}, et je n'attaque pas sans déclaration. `
+         + `Déclare-la depuis l'onglet Diplomatie — ou dis-le-lui toi-même — et je m'en charge ensuite.`;
   const plan = planDeGuerre(ennemi);
   if(!plan.possible)
     return `Aucune province de ${ennemi.nom} n'est à portée — ni par la terre, ni par la mer.`
