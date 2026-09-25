@@ -83,7 +83,20 @@
 <div id="accueil" class="hidden">
   <div class="accbox">
     <h1>Nation</h1>
-    <p class="accsous">Choisis le monde dans lequel tu veux régner.</p>
+    <p class="accsous">Choisis ta partie, puis le monde dans lequel tu veux régner.</p>
+
+    <div class="accmodes">
+      <button class="accmode actif" data-mode="courte">
+        <b>Partie courte</b>
+        <span>Cinq ans. Le plus grand royaume l'emporte.</span>
+        <i>≈ 5 minutes</i>
+      </button>
+      <button class="accmode" data-mode="longue">
+        <b>Partie longue</b>
+        <span>Sans limite. Règne jusqu'à la victoire totale.</span>
+        <i>aussi longtemps que tu veux</i>
+      </button>
+    </div>
 
     <label class="accchamp"><span>Adversaires</span><b id="vAdv">6</b>
       <input class="slider" type="range" id="sAdv" min="1" max="29" value="6"></label>

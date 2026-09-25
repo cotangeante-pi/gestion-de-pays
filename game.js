@@ -206,7 +206,7 @@ const COULEURS = ['#e05252','#e0a63a','#8e5ce0','#25b0a0','#d9569b','#5d7ce0',
 const S = {
   tiles:new Map(), nations:[], player:null, sel:null,
   mois:0, paused:true, speed:1, acc:0, log:[],
-  cam:{x:0,y:0,z:1}, tab:'province', chatOuvert:null, prime:null,
+  cam:{x:0,y:0,z:1}, tab:'province', chatOuvert:null, prime:null, finMois:0, mode:'courte',
 };
 
 const key = (q,r)=>q+','+r;
@@ -239,7 +239,21 @@ const TAILLES = [
 const MAX_ADVERSAIRES = Math.min(NOMS_IA.length, COULEURS.length) - 1;   // autant que de noms
 
 const MAX_ILES = 18;
-const CONFIG = {adversaires:6, iles:6, taille:2};
+
+/* ===========================================================
+   DEUX FAÇONS DE JOUER
+   La partie courte a une fin annoncée : cinq ans, et le plus
+   grand royaume l'emporte. La partie longue est celle d'avant,
+   sans horloge, jusqu'à la victoire totale.
+   =========================================================== */
+const MODES = {
+  courte: {nom:'Partie courte', duree:60, ms:1800, adversaires:5, iles:3, taille:1,
+           objectif:'Cinq ans pour bâtir le plus grand royaume.'},
+  longue: {nom:'Partie longue', duree:0,  ms:2500, adversaires:6, iles:6, taille:2,
+           objectif:'Sans limite : règne jusqu\'à la victoire totale.'},
+};
+
+const CONFIG = {mode:'courte', adversaires:5, iles:3, taille:1};
 
 // surface de terre visée, et rayon de carte qui va avec
 function planMonde(cfg = CONFIG){
@@ -264,6 +278,17 @@ function genererMonde(cfg = CONFIG){
   const plan = planMonde(cfg);
   const RAYON = plan.rayon;
   S.plan = plan;
+
+  // table rase : sans cela, « Nouvelle partie » empilait les nations de la
+  // partie précédente sur celles du nouveau monde, avec des identifiants qui
+  // se recouvraient
+  S.tiles = new Map();
+  S.nations = [];
+  S.player = null;
+  S.sel = null;
+  S.chatOuvert = null;
+  if(typeof oublierMer === 'function') oublierMer();
+  if(typeof oublierRendu === 'function') oublierRendu();
 
   // 1. disque d'hexagones
   for(let q=-RAYON;q<=RAYON;q++){
@@ -547,6 +572,7 @@ function tickMois(){
   majUI();
   if(S.mois % 12 === 0) sauvegarder(true);
   if(S.mois%12===0) verifierFin();
+  if(S.finMois && S.mois >= S.finMois) finDuTemps();
 }
 
 // ---------- IA ----------
@@ -750,10 +776,37 @@ function evenementAleatoire(){
 function verifierFin(){
   const vivants = S.nations.filter(n=>tuilesDe(n).length>0);
   if(tuilesDe(S.player).length===0){
-    S.paused=true; modal('Défaite','Ton pays a disparu de la carte…');
+    S.paused=true; majVitesse(); modal('Défaite','Ton pays a disparu de la carte…');
+    if(typeof SDK !== 'undefined') SDK.partieFin();
   } else if(vivants.length===1){
-    S.paused=true; modal('Victoire totale','Tu règnes seul sur le monde !');
+    S.paused=true; majVitesse(); modal('Victoire totale','Tu règnes seul sur le monde !');
+    if(typeof SDK !== 'undefined') SDK.partieFin();
   }
+}
+
+// le compte des provinces départage la partie courte ; la puissance en cas d'égalité
+function classementFinal(){
+  return S.nations.filter(n => tuilesDe(n).length > 0)
+    .map(n => ({n, prov: tuilesDe(n).length, force: puissance(n)}))
+    .sort((a,b) => (b.prov - a.prov) || (b.force - a.force));
+}
+
+function finDuTemps(){
+  S.paused = true; majVitesse();
+  const cl = classementFinal();
+  const moi = cl.findIndex(x => x.n.joueur) + 1;
+  const gagnant = cl[0];
+  const lignes = cl.slice(0, 5).map((x, i) =>
+    `${i+1}. ${x.n.joueur ? '<b>' + x.n.nom + ' (toi)</b>' : x.n.nom} — `
+    + `${x.prov} province${x.prov>1?'s':''}, puissance ${x.force.toFixed(0)}`).join('<br>');
+  const titre = gagnant && gagnant.n.joueur ? 'Victoire' : `${moi}ᵉ sur ${cl.length}`;
+  modal(`Cinq ans ont passé — ${titre}`,
+    (gagnant && gagnant.n.joueur
+      ? 'Ton royaume est le plus grand du monde connu.'
+      : `${gagnant ? gagnant.n.nom : 'Personne'} l'emporte avec ${gagnant ? gagnant.prov : 0} provinces.`)
+    + '<br><br>' + lignes);
+  logue(`${ic('monde')} <b>Fin de la partie courte.</b> ${titre}.`, gagnant && gagnant.n.joueur ? 'good' : 'bad');
+  if(typeof SDK !== 'undefined') SDK.partieFin();
 }
 
 /* ===========================================================
@@ -800,7 +853,11 @@ function majBarre(){
   const prime = (typeof primeActive === 'function' && primeActive())
     ? `<span class="tag war" title="Tu as rompu une alliance avant son terme : chaque province qu'on te prend rapporte ${S.prime.montant} or à son vainqueur">`
       + `${ic('guerre')} Tête mise à prix · ${primeReste()} mois</span>` : '';
-  document.getElementById('resBar').innerHTML = prime + `
+  const reste = S.finMois ? Math.max(0, S.finMois - S.mois) : 0;
+  const horloge = S.finMois
+    ? `<span class="tag ${reste<=12?'war':''}" title="Partie courte : à la fin, le plus grand royaume l'emporte">`
+      + `${ic('temps')} ${reste} mois</span>` : '';
+  document.getElementById('resBar').innerHTML = horloge + prime + `
     <span title="Trésor national">${ic('or')} <b>${fmt(p.or)}</b> ${d(b.net)}</span>
     <span title="Matériaux de construction">${ic('mat')} <b>${fmt(p.mat)}</b> ${d(b.mat)}</span>
     <span title="Réserves de nourriture">${ic('food')} <b>${fmt(p.nourriture)}</b> ${d(b.netFood)}</span>
@@ -1356,7 +1413,7 @@ function majUI(){
    BOUCLE DE JEU
    =========================================================== */
 
-const MS_PAR_MOIS = 2500;
+let MS_PAR_MOIS = 2500;
 
 function boucle(ts){
   if(!boucle.last) boucle.last = ts;
@@ -1432,6 +1489,19 @@ const accueilEl = id => document.getElementById(id);
 // une valeur illisible ne doit pas produire un NaN qui traverserait la génération
 const nombreSur = (v, defaut) => Number.isFinite(+v) ? +v : defaut;
 
+function choisirMode(cle){
+  if(!MODES[cle]) return;
+  CONFIG.mode = cle;
+  const m = MODES[cle];
+  // la partie courte propose d'emblée un monde à sa mesure
+  accueilEl('sAdv').value    = m.adversaires;
+  accueilEl('sIles').value   = m.iles;
+  accueilEl('sTaille').value = m.taille;
+  document.querySelectorAll('.accmode').forEach(b =>
+    b.classList.toggle('actif', b.dataset.mode === cle));
+  majApercu();
+}
+
 function lireReglages(){
   CONFIG.adversaires = clamp(nombreSur(accueilEl('sAdv').value,    6), 1, MAX_ADVERSAIRES);
   CONFIG.iles        = clamp(nombreSur(accueilEl('sIles').value,   6), 1, MAX_ILES);
@@ -1446,8 +1516,15 @@ function majApercu(){
   accueilEl('vIles').textContent   = CONFIG.iles;
   accueilEl('vTaille').textContent = TAILLES[CONFIG.taille].nom;
 
-  const l = [`Un monde d'environ <b>${cases}</b> cases, dont à peu près `
-           + `<b>${p.terre}</b> de terre ferme, pour <b>${p.nations}</b> nations.`];
+  const m = MODES[CONFIG.mode] || MODES.longue;
+  const l = [];
+  l.push(m.duree
+    ? `<b>${m.objectif}</b> ${m.duree} mois de jeu, `
+      + `soit environ ${Math.round(m.duree * m.ms / 60000)} minutes en vitesse normale — `
+      + `plus le temps que tu prends à décider.`
+    : `<b>${m.objectif}</b> Aucune horloge : la partie s'arrête quand tu règnes seul, ou quand tu tombes.`);
+  l.push(`Un monde d'environ <b>${cases}</b> cases, dont à peu près `
+       + `<b>${p.terre}</b> de terre ferme, pour <b>${p.nations}</b> nations.`);
   if(p.agrandi)
     l.push(`<em>Les îles seront agrandies :</em> la taille choisie ne suffirait pas à loger `
          + `${p.nations} capitales.`);
@@ -1471,6 +1548,9 @@ function fermerAccueil(){ accueilEl('accueil').classList.add('hidden'); }
 ['sAdv','sIles','sTaille'].forEach(id => accueilEl(id).oninput = majApercu);
 // les touches du jeu ne doivent pas agir pendant qu'on règle les curseurs
 accueilEl('accueil').addEventListener('keydown', e => e.stopPropagation());
+
+document.querySelectorAll('.accmode').forEach(b =>
+  b.onclick = ()=> choisirMode(b.dataset.mode));
 
 accueilEl('accJouer').onclick = ()=>{
   lireReglages();
@@ -1630,7 +1710,7 @@ function sauvegarder(auto){
         capitale: n.capitale ? key(n.capitale.q, n.capitale.r) : null,
       })),
       conseil: S.conseil ? {chat:S.conseil.chat.slice(-30)} : null,
-      prime: S.prime || null,
+      prime: S.prime || null, finMois: S.finMois || 0, mode: CONFIG.mode,
       log: S.log.slice(-150),
       tiles: [...S.tiles.values()].map(t=>({
         q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:+t.pop.toFixed(2),
@@ -1682,6 +1762,8 @@ function appliquerSauvegarde(d){
   if(typeof oublierRendu === 'function') oublierRendu();
   S.log = Array.isArray(d.log) ? d.log : [];
   S.prime = d.prime || null;
+  S.finMois = d.finMois || 0;
+  if(d.mode && MODES[d.mode]){ CONFIG.mode = d.mode; MS_PAR_MOIS = MODES[d.mode].ms; }
   S.conseil = {chat:(d.conseil && d.conseil.chat) || [], nonLus:0, proposition:null};
 }
 
@@ -1694,6 +1776,9 @@ function nouvellePartie(){
     S.log = [];                 // la chronique du règne précédent ne déborde pas sur le nouveau
     S.conseil = null;           // ni la conversation du Conseil, ni son contexte
     S.chatOuvert = null; oublierRendu(); S.prime = null;
+    const m = MODES[CONFIG.mode] || MODES.longue;
+    MS_PAR_MOIS = m.ms;
+    S.finMois = m.duree || 0;
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
     logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`
