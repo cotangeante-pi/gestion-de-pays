@@ -434,6 +434,7 @@ function appliquer(n, d){
   if(E.alliance){ p.allies.add(n.id); n.allies.add(p.id); p.pacte.add(n.id); n.pacte.add(p.id);
                   n.rel[p.id] = clamp(n.rel[p.id]+12,-100,100);
                   if(typeof ouvrirAlliance === 'function') ouvrirAlliance(n);
+                  if(typeof SDK !== 'undefined') SDK.moment();
                   maj.push(`alliance pour ${DUREE_ALLIANCE} mois`); }
   if(E.commerce){ (p.commerce ||= new Set()).add(n.id); (n.commerce ||= new Set()).add(p.id);
                   maj.push('accord commercial'); }

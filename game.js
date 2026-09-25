@@ -708,6 +708,7 @@ function bataille(att, def, tuile, frac, debarquement){
       logue(`${ic('or')} <b>${att.nom}</b> touche ${S.prime.montant} or de prime pour cette province.`, 'bad');
     }
     txt = 'Province conquise'; conquise = true;
+    if(att.joueur && typeof SDK !== 'undefined') SDK.moment();
   } else {
     const pc = Math.round(tuile.occ.val*100);
     txt = gagne ? `Front avancé · ${pc}%` : `Assaut contenu · ${pc}%`;
@@ -1216,8 +1217,15 @@ function rendreConversation(el, v){
   const fil = document.getElementById('fil');
   const memeFil = _rendu.cle === v.cle && fil && el.contains(fil);
 
-  const brancherSugg = ()=> el.querySelectorAll('[data-sugg]').forEach(b =>
-    b.onclick = ()=> { if(!v.occupe()) v.envoyer(b.dataset.sugg); });
+  const brancherSugg = ()=> {
+    el.querySelectorAll('[data-sugg]').forEach(b =>
+      b.onclick = ()=> { if(!v.occupe()) v.envoyer(b.dataset.sugg); });
+    if(v.composeur && v.nation && typeof brancherComposeur === 'function')
+      brancherComposeur(el, v.nation,
+        ()=> { const z = document.getElementById('sugg');
+               if(z){ z.innerHTML = htmlComposeur(v.nation); brancherSugg(); } },
+        t => { if(!v.occupe()) v.envoyer(t); });
+  };
   const brancherEntete = ()=> {
     const r = document.getElementById('chatRetour');
     if(r) r.onclick = ()=>{ S.chatOuvert = null; oublierRendu(); majUI(); };
@@ -1376,6 +1384,7 @@ function panChat(){
 
   rendreConversation(el, {
     cle: 'N' + n.id,
+    composeur: true,
     entete: `<button class="btn mini" id="chatRetour" style="flex:none">←</button>
       <div><b><i class="flag" style="background:${n.col}"></i>${echappe(n.nom)}</b>
         <div class="muted">${PERSOS[n.perso].nom} · ${humeur} · ${tuilesDe(n).length} provinces · relation ${r}
@@ -1385,9 +1394,10 @@ function panChat(){
           ${n.negociation && S.mois-n.negociation.mois<=8 ? `<span class="tag nego">offre : ${n.negociation.demande} or</span>`:''}</div></div>`,
     messages: n.chat,
     ecrit: !!n.ecrit,
-    sugg: puces(sugg),
-    invite: `Écris à ${echappe(n.nom)}…`,
+    sugg: htmlComposeur(n),
+    invite: `…ou écris-lui librement`,
     vide: '',
+    nation: n,
     occupe: ()=> !!n.ecrit,
     envoyer: t => envoyerMessage(n, t),
   });
@@ -1458,6 +1468,10 @@ function majVitesse(){
   document.querySelectorAll('.spd[data-speed]').forEach(b=>
     b.classList.toggle('on', !S.paused && +b.dataset.speed===S.speed));
   document.body.classList.toggle('enpause', S.paused);
+  if(typeof SDK !== 'undefined'){
+    const enPartie = !S.paused && S.player && tuilesDe(S.player).length > 0;
+    enPartie ? SDK.partieDebut() : SDK.partieFin();
+  }
   if(typeof majUI === 'function') majUI();     // les actions interdites s'éteignent
 }
 window.addEventListener('keydown', e=>{
@@ -1538,6 +1552,7 @@ function majApercu(){
 }
 
 function ouvrirAccueil(){
+  if(typeof SDK !== 'undefined') SDK.partieFin();
   accueilEl('accueil').classList.remove('hidden');
   S.paused = true; majVitesse();
   accueilEl('accCharger').classList.toggle('hidden', !localStorage.getItem(CLE_SAUV));
@@ -1555,13 +1570,22 @@ document.querySelectorAll('.accmode').forEach(b =>
 accueilEl('accJouer').onclick = ()=>{
   lireReglages();
   fermerAccueil();
-  nouvellePartie();
+  // une coupure ne se place qu'entre deux parties, jamais pendant
+  const lancer = ()=>{ nouvellePartie(); if(typeof SDK !== 'undefined') SDK.partieDebut(); };
+  if(typeof SDK !== 'undefined') SDK.coupure(lancer); else lancer();
 };
-accueilEl('accCharger').onclick = ()=>{ fermerAccueil(); charger(); };
+accueilEl('accCharger').onclick = ()=>{
+  fermerAccueil();
+  const lancer = ()=>{ charger(); if(typeof SDK !== 'undefined') SDK.partieDebut(); };
+  if(typeof SDK !== 'undefined') SDK.coupure(lancer); else lancer();
+};
 
 window.addEventListener('load', ()=>{
+  if(typeof SDK !== 'undefined') SDK.demarrer();
   setTimeout(()=>{
+    if(typeof SDK !== 'undefined') SDK.chargementDebut();
     demarrer();
+    if(typeof SDK !== 'undefined') SDK.chargementFin();
     accueilEl('chargement').classList.add('hidden');
     requestAnimationFrame(boucle);
     ouvrirAccueil();

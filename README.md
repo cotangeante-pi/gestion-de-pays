@@ -81,6 +81,22 @@ que font les autres nations.
 Un Conseil de la Couronne partage le même moteur et gère ton pays avec toi :
 il diagnostique, projette, classe les actions par rendement et exécute tes ordres.
 
+## Deux façons de jouer
+
+La **partie courte** tient en cinq ans : elle s'arrête d'elle-même et classe les
+nations par provinces. Environ deux minutes de temps de jeu, plus le temps que
+tu prends à décider. La **partie longue** est sans horloge, jusqu'à la victoire
+totale.
+
+## Négocier au clic
+
+On choisit une intention, on règle ses paramètres, on coche ses arguments — le
+composeur en fait une phrase française qui repart dans le **même** moteur de
+compréhension que la saisie libre. Rien n'est court-circuité : cocher « nous
+avons un ennemi commun » fait réellement vérifier le fait, et fait tomber le
+prix d'une alliance de 680 à 380 or. Le clavier reste disponible pour qui
+préfère écrire.
+
 ## Alliances
 
 Une alliance se plaide. Le dirigeant compare ce qu'elle t'apporte à ce qu'elle
@@ -134,5 +150,7 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `diplomatie.js` | caractères, mémoire, décisions, répliques |
 | `courrier.js` | veille du monde et correspondance spontanée |
 | `alliance.js` | plaidoirie, contrat daté, prime de trahison |
+| `composeur.js` | négociation au clic, traduite en phrases |
+| `sdk.js` | adaptateur de plateforme, facultatif |
 | `bataille-ecran.js` | lunette de campagne et ralenti du temps |
 | `conseil.js` | Conseil de la Couronne |
