@@ -1815,12 +1815,16 @@ function nouvellePartie(){
     S.finMois = m.duree || 0;
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
-    logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`
-        + `${CONFIG.adversaires>1?'s':''}, ${CONFIG.iles} île${CONFIG.iles>1?'s':''} `
-        + `${TAILLES[CONFIG.taille].nom}. Ton pays est né. <kbd>Espace</kbd> pause · `
-        + `<kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · `
-        + `<kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
-    if(typeof tutoProposer === 'function') setTimeout(tutoProposer, 900);
+    const fin = ()=>{
+      logue(`${ic('monde')} <b>${dateTexte()}</b> — ${CONFIG.adversaires} adversaire`
+          + `${CONFIG.adversaires>1?'s':''}, ${CONFIG.iles} île${CONFIG.iles>1?'s':''} `
+          + `${TAILLES[CONFIG.taille].nom}. Ton pays est né. <kbd>Espace</kbd> pause · `
+          + `<kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · `
+          + `<kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
+      if(typeof tutoProposer === 'function') setTimeout(tutoProposer, 900);
+    };
+    // l'introduction raconte l'arrivée, puis recule jusqu'à la carte
+    if(typeof jouerIntro === 'function') jouerIntro(fin); else fin();
   }, 60);
 }
 

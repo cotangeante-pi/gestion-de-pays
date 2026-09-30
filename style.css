@@ -264,6 +264,26 @@ kbd{background:#1c2740;border:1px solid var(--line2);border-bottom-width:2px;bor
 .accboutons .btn{margin:0;text-align:center;font-weight:700}
 .accboutons .btn.hidden{display:none !important}
 
+/* ===== introduction : « Le départ » ===== */
+#intro{position:fixed;inset:0;z-index:170;cursor:pointer;overflow:hidden}
+#intro.hidden{display:none}
+#introcv{position:absolute;inset:0;width:100%;height:100%;display:block;transition:opacity .2s linear}
+/* bandes de cinéma */
+#intro::before,#intro::after{content:"";position:absolute;left:0;right:0;height:7vh;background:#000;
+  z-index:1;transition:height 1.4s ease}
+#intro::before{top:0}
+#intro::after{bottom:0}
+#intro.fondu::before,#intro.fondu::after{height:0}
+#introTexte{position:absolute;left:1rem;right:1rem;bottom:calc(7vh + 1.25rem);z-index:2;
+  text-align:center;pointer-events:none}
+#introTexte span{display:inline-block;max-width:min(40rem, calc(100vw - 2rem));white-space:normal;box-sizing:border-box;padding:0.5rem 1rem;border-radius:0.5rem;
+  background:#040810aa;color:#f2ecdf;font-size:clamp(0.95rem,2.4vw,1.35rem);line-height:1.45;
+  font-style:italic;letter-spacing:.02em;text-shadow:0 1px 3px #000;animation:apparait .5s ease}
+#introPasser{position:absolute;top:calc(7vh + 0.75rem);right:1rem;z-index:2;
+  background:#04081088;color:#c9d3e6;border:1px solid #ffffff33;border-radius:1rem;
+  padding:0.3rem 0.9rem;font-size:max(11px,0.8125rem);cursor:pointer}
+#introPasser:hover{background:#0c1830cc;color:#fff}
+
 /* ===== écran de chargement ===== */
 #chargement{position:fixed;inset:0;z-index:200;background:#070c16;display:flex;
   flex-direction:column;align-items:center;justify-content:center;gap:1.125rem;color:var(--dim)}

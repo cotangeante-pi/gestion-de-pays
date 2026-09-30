@@ -12,6 +12,17 @@ que tout le monde tienne — une seule île minuscule avec onze adversaires sera
 agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
 jamais : franchir un bras de mer demande une marine.
 
+## L'introduction
+
+Chaque nouvelle partie s'ouvre sur une courte scène, dessinée à la volée : un
+meneur rallie les siens sur un quai au crépuscule, ils embarquent, traversent la
+mer de nuit, débarquent à l'aube et plantent le drapeau du pays… avant de
+découvrir, à l'horizon, les feux et les couleurs des nations rivales. Puis la
+scène s'efface et la caméra recule de ta capitale jusqu'à la carte entière :
+la partie commence. Environ 45 secondes ; un clic passe au sous-titre suivant,
+`Échap`, `Entrée`, `Espace` ou le bouton *Passer* vont droit au jeu. Une
+sauvegarde reprise ne la rejoue pas.
+
 ## La capitale
 
 Chaque nation a une capitale, placée loin des autres. Elle n'est pas qu'un
@@ -179,5 +190,6 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `bataille-ecran.js` | lunette de campagne et ralenti du temps |
 | `conseil.js` | Conseil de la Couronne |
 | `son.js` | sons composés à la volée et petite voix |
+| `intro.js` | scène d'introduction et dézoom vers la carte |
 | `tutoriel.js` | tutoriel pas à pas, en chapitres |
 | `tests/banc-ia.html` | banc de test de la compréhension : ouvre-le dans un navigateur |
