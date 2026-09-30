@@ -17,6 +17,7 @@ const Combat = {
 
 /* --- un carillon bref et doux : deux notes, pas d'attaque sèche --- */
 function bruitAlerte(){
+  if(typeof SON !== 'undefined' && !SON.actif()) return;
   try{
     if(!Combat.ctxAudio){
       const AC = window.AudioContext || window.webkitAudioContext;

@@ -6,8 +6,8 @@ ouvre `index.html` dans un navigateur et joue.
 Tu commences avec ta seule capitale. Tout le reste — provinces, bâtiments,
 technologies, alliances — se colonise, se construit ou se négocie.
 
-Avant de jouer, tu choisis ton monde : le nombre d'adversaires (1 à 11), le
-nombre d'îles (1 à 8) et leur taille. La carte se dimensionne d'elle-même pour
+Avant de jouer, tu choisis ton monde : le nombre d'adversaires (1 à 29), le
+nombre d'îles (1 à 18) et leur taille. La carte se dimensionne d'elle-même pour
 que tout le monde tienne — une seule île minuscule avec onze adversaires sera
 agrandie d'office, et l'écran de départ te le dit. Les îles ne se soudent
 jamais : franchir un bras de mer demande une marine.
@@ -45,6 +45,26 @@ débarquées frappent à 70 % de leur force, et l'expédition est plafonnée par
 que la flotte sait porter. L'IA prend la mer aux mêmes conditions, et le Conseil
 planifie les débarquements comme les offensives terrestres.
 
+## Le tutoriel
+
+À la toute première partie, un guide propose de tout montrer, pas à pas :
+9 chapitres, 33 étapes, des bases jusqu'à la mer. Un projecteur éclaire la
+zone concernée et, pour les gestes importants (construire, coloniser,
+recruter, écrire à un dirigeant, interroger le Conseil…), c'est **le joueur
+qui agit** : le tutoriel attend le geste, le détecte et le félicite. Le temps
+du royaume reste figé pendant tout le tutoriel, mais les actions restent
+permises. Le bouton 🎓 rejoue le tutoriel entier ou un seul chapitre.
+
+## Sons et voix
+
+Chaque événement a sa signature sonore (construction, pièces, recrutement,
+découverte, guerre, paix, conquête, message reçu…), composée à la volée avec
+la Web Audio API : aucun fichier audio, des notes douces et courtes. Les grands
+moments sont salués par une petite voix française (« Bravo ! », « Province
+conquise ! », « Victoire ! »), jamais plus d'une fois toutes les quelques
+secondes. Le bouton 🔊 passe de *sons et voix* à *sons seuls* puis à *silence* ;
+le choix est mémorisé.
+
 ## Ce qui rend ce projet particulier
 
 L'IA ne s'appuie sur aucun modèle de langage : tout est calculé en local.
@@ -54,7 +74,10 @@ pré-écrites. Chaque mot est racinisé, projeté dans un espace d'une trentaine
 concepts (`paix`, `menace`, `argent`, `échange`, `bonheur`…), puis la phrase est
 classée par similarité cosinus avec des prototypes d'actes de langage. Les mots
 inconnus sont rattachés par similarité de forme, ce qui absorbe les fautes de
-frappe. Une phrase composée est découpée en clauses.
+frappe. Une phrase composée est découpée en clauses. Le langage parlé est
+ramené à la langue du lexique avant l'analyse : « slt », « ok », « nan »,
+« dsl », « t nul », « file moi 100 thunes », « je vais t'exploser »…
+Un banc de 60 phrases (`tests/banc-ia.html`) vérifie tout cela d'un coup d'œil.
 
 **Raisonner.** Aucun seuil écrit à la main : chaque dirigeant mesure l'état du
 monde tel qu'il le voit, projette l'état qui résulterait de chaque option, et
@@ -84,8 +107,8 @@ il diagnostique, projette, classe les actions par rendement et exécute tes ordr
 ## Deux façons de jouer
 
 La **partie courte** tient en cinq ans : elle s'arrête d'elle-même et classe les
-nations par provinces. Environ deux minutes de temps de jeu, plus le temps que
-tu prends à décider. La **partie longue** est sans horloge, jusqu'à la victoire
+nations par provinces. Environ deux minutes en vitesse normale, plus le temps
+que tu prends à décider — cinq minutes en pratique. La **partie longue** est sans horloge, jusqu'à la victoire
 totale.
 
 ## Négocier au clic
@@ -145,6 +168,7 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `render.js`, `relief.js` | rendu de la carte et du relief |
 | `ia.js` | compréhension, raisonnement, génération de parole |
 | `ia-gestion.js` | lexique et intentions du Conseil |
+| `ia-oral.js` | langage parlé : abréviations, argot, insultes, compliments, menaces |
 | `marine.js` | portée navale, débarquements, colonisation outre-mer |
 | `negociation.js` | propositions structurées, ultimatums, crédibilité |
 | `diplomatie.js` | caractères, mémoire, décisions, répliques |
@@ -154,3 +178,6 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `sdk.js` | adaptateur de plateforme, facultatif |
 | `bataille-ecran.js` | lunette de campagne et ralenti du temps |
 | `conseil.js` | Conseil de la Couronne |
+| `son.js` | sons composés à la volée et petite voix |
+| `tutoriel.js` | tutoriel pas à pas, en chapitres |
+| `tests/banc-ia.html` | banc de test de la compréhension : ouvre-le dans un navigateur |

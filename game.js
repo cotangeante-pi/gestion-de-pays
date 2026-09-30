@@ -778,9 +778,11 @@ function verifierFin(){
   const vivants = S.nations.filter(n=>tuilesDe(n).length>0);
   if(tuilesDe(S.player).length===0){
     S.paused=true; majVitesse(); modal('Défaite','Ton pays a disparu de la carte…');
+    if(typeof SON !== 'undefined'){ SON.jouer('defaite'); SON.direUn(PHRASES.defaite, true); }
     if(typeof SDK !== 'undefined') SDK.partieFin();
   } else if(vivants.length===1){
     S.paused=true; majVitesse(); modal('Victoire totale','Tu règnes seul sur le monde !');
+    if(typeof SON !== 'undefined'){ SON.jouer('victoire'); SON.direUn(PHRASES.victoire, true); }
     if(typeof SDK !== 'undefined') SDK.partieFin();
   }
 }
@@ -807,6 +809,11 @@ function finDuTemps(){
       : `${gagnant ? gagnant.n.nom : 'Personne'} l'emporte avec ${gagnant ? gagnant.prov : 0} provinces.`)
     + '<br><br>' + lignes);
   logue(`${ic('monde')} <b>Fin de la partie courte.</b> ${titre}.`, gagnant && gagnant.n.joueur ? 'good' : 'bad');
+  if(typeof SON !== 'undefined'){
+    if(gagnant && gagnant.n.joueur){ SON.jouer('victoire'); SON.direUn(PHRASES.victoire, true); }
+    else if(moi <= 3){ SON.jouer('reussi'); SON.dire(`Bravo, tu finis ${moi === 2 ? 'deuxième' : 'troisième'} !`, true); }
+    else { SON.jouer('defaite'); SON.dire('Partie terminée. Tu feras mieux la prochaine fois !', true); }
+  }
   if(typeof SDK !== 'undefined') SDK.partieFin();
 }
 
@@ -825,6 +832,7 @@ function logue(txt, cls=''){
   const el = document.getElementById('log');
   el.appendChild(d); el.scrollTop = el.scrollHeight;
   while(el.children.length>120) el.removeChild(el.firstChild);
+  if(typeof sonDuJournal === 'function') sonDuJournal(txt, cls);
 }
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
@@ -1444,7 +1452,9 @@ function boucle(ts){
    il suffirait de tout mener à bien pendant que rien ne coûte.
    =========================================================== */
 const PERMIS_EN_PAUSE = new Set(['recruter','dissoudre','discuter']);
-const actionPermise = type => !S.paused || PERMIS_EN_PAUSE.has(type);
+// pendant le tutoriel le temps est figé, mais le joueur doit pouvoir s'exercer
+const actionPermise = type => !S.paused || PERMIS_EN_PAUSE.has(type)
+                              || (typeof TUTO !== 'undefined' && TUTO.actif);
 // 'disabled' à coller dans le HTML des boutons concernés
 const bridePause = (type, dejaBride) => (dejaBride || !actionPermise(type)) ? 'disabled' : '';
 let dernierRefus = 0;
@@ -1810,6 +1820,7 @@ function nouvellePartie(){
         + `${TAILLES[CONFIG.taille].nom}. Ton pays est né. <kbd>Espace</kbd> pause · `
         + `<kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · `
         + `<kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
+    if(typeof tutoProposer === 'function') setTimeout(tutoProposer, 900);
   }, 60);
 }
 
@@ -1828,8 +1839,9 @@ function texteAide(){
   const u = k => `<b>${ic(k)} ${UNITES[k].nom}</b> — ${UNITES[k].att} att · ${UNITES[k].def} déf · ${UNITES[k].or} or + ${UNITES[k].mat} matériaux · ${UNITES[k].hommes.toLocaleString('fr-FR')} hommes${UNITES[k].tech?` · requiert ${TECHS[UNITES[k].tech].nom}`:''}`;
   return `
   <h1>Règles du jeu</h1>
-  <p>Tu diriges un pays sur un monde généré au hasard. Six nations rivales, pilotées par l'ordinateur,
-  se développent en même temps que toi. Le temps s'écoule <b>mois par mois</b> en temps réel : mets en pause
+  <p>Tu diriges un pays sur un monde généré au hasard. Des nations rivales (de 1 à ${MAX_ADVERSAIRES}, selon ton choix
+  au départ), pilotées par l'ordinateur, se développent en même temps que toi. Première partie ? Le bouton
+  <b>🎓</b> lance un tutoriel pas à pas, et <b>🔊</b> règle les sons et la voix. Le temps s'écoule <b>mois par mois</b> en temps réel : mets en pause
   quand tu veux avec <kbd>Espace</kbd>.</p>
 
   <h2>${ic('monde')} But du jeu</h2>
@@ -1848,7 +1860,8 @@ function texteAide(){
   </div>
 
   <h2>${ic('batir')} Provinces et bâtiments</h2>
-  <p>Clique une province pour l'ouvrir. Chaque province accueille <b>un seul bâtiment</b> et peut être
+  <p>Clique une province pour l'ouvrir. Chaque province accueille <b>plusieurs ouvrages</b>, selon sa population
+  et son terrain (voir « Provinces » plus bas), et peut être
   <b>fortifiée</b> (+10% de défense par niveau). Les terres inoccupées voisines de ton territoire peuvent être
   <b>colonisées</b> pour 120 or.</p>
   <ul>${Object.entries(BUILDINGS).map(([k,b])=>`<li>${ic(k)} <b>${b.nom}</b> — ${b.desc} (${b.or} or + ${b.mat} matériaux, entretien ${b.up}/mois)${b.tech?` · requiert ${TECHS[b.tech].nom}`:''}</li>`).join('')}</ul>

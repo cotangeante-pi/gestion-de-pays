@@ -417,3 +417,58 @@ body.enpause #side::before{content:"⏸ temps arrêté — discussion et recrute
 .iabascule input{accent-color:var(--acc);width:1rem;height:1rem}
 .iaboutons{display:flex;gap:0.4375rem;margin:0.875rem 0 0.375rem;flex-wrap:wrap}
 .tag.nego{background:#3d3420;color:#ffc861}
+
+/* ===== tutoriel ===== */
+#tutoVoile{position:fixed;inset:0;z-index:108;background:#040810a8;pointer-events:none;
+  animation:tutoApparait .3s ease}
+#tutoHalo{position:fixed;z-index:109;pointer-events:none;border-radius:0.75rem;
+  border:2px solid var(--warn);box-shadow:0 0 0 9999px #040810a0, 0 0 22px 4px #ffc86188;
+  transition:left .35s ease, top .35s ease, width .35s ease, height .35s ease;
+  animation:tutoPulse 1.6s ease-in-out infinite}
+#tutoHalo.centre{left:50%!important;top:50%!important;width:0!important;height:0!important;
+  border:none;box-shadow:none;animation:none}
+#tutoBulle{position:fixed;z-index:140;box-sizing:border-box;background:linear-gradient(180deg,#18233a,#0f1829);
+  border:1px solid var(--line2);border-radius:1rem;padding:0.875rem 1rem 0.75rem;
+  box-shadow:0 18px 50px #000b, 0 0 0 1px #ffc86133;color:var(--txt);
+  transition:left .3s ease, top .3s ease, box-shadow .3s}
+#tutoBulle.neuf{animation:tutoEntre .35s ease}
+#tutoBulle.bravo{box-shadow:0 18px 50px #000b, 0 0 0 2px var(--good), 0 0 28px #4ad99166}
+.tutotete{display:flex;align-items:center;gap:0.625rem;margin-bottom:0.5rem}
+.tutoguide{font-size:1.875rem;line-height:1;animation:tutoHibou 3s ease-in-out infinite}
+.tutotitres{flex:1;display:flex;flex-direction:column;min-width:0}
+#tutoChap{font-size:0.6875rem;color:var(--acc2);letter-spacing:0.03rem}
+#tutoTitre{font-size:1.0625rem}
+#tutoX{background:none;border:none;color:var(--dim);font-size:1.125rem;cursor:pointer;padding:0.25rem}
+#tutoX:hover{color:#fff}
+.tutoprog{height:0.25rem;background:#0a1120;border-radius:0.25rem;overflow:hidden;margin-bottom:0.625rem}
+.tutoprog i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));
+  transition:width .4s ease}
+#tutoTexte{font-size:0.875rem;line-height:1.55;color:#cfdaee;max-height:52vh;overflow-y:auto}
+#tutoTexte b{color:#fff}
+#tutoTexte ul{margin:0.375rem 0;padding-left:1.125rem}
+#tutoTexte li{margin:0.1875rem 0}
+#tutoAction{margin-top:0.625rem;padding:0.4375rem 0.625rem;border-radius:0.5rem;background:#ffc86118;
+  color:var(--warn);font-weight:700;font-size:0.8125rem;display:flex;align-items:center;gap:0.5rem}
+#tutoBulle.bravo #tutoAction{background:#4ad99122;color:var(--good)}
+.tutopulse{width:0.5625rem;height:0.5625rem;border-radius:50%;background:var(--warn);
+  animation:tutoPulse 1.2s ease-in-out infinite}
+.tutobtns{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-top:0.75rem}
+.tutobtns .btn{width:auto;margin:0;flex:none;text-align:center}
+#tutoSuiv{background:linear-gradient(180deg,#5cb0ff,#3d8ce0);color:#04101f;font-weight:800;border-color:#6bb8ff}
+.tutolien{background:none;border:none;color:var(--dim2);font-size:0.75rem;cursor:pointer;text-decoration:underline}
+.tutolien:hover{color:var(--dim)}
+#tutoMenu{position:fixed;inset:0;z-index:145;background:#040810dd;backdrop-filter:blur(0.3125rem);
+  display:flex;align-items:center;justify-content:center;padding:1rem}
+.tutomenubox{position:relative;width:min(28rem,100%);max-height:100%;overflow-y:auto;
+  background:var(--bg2);border:1px solid var(--line2);border-radius:1rem;padding:1.25rem 1.25rem 1rem;
+  box-shadow:0 20px 60px #000c;animation:tutoEntre .3s ease}
+.tutomenubox h2{margin:0 0 0.25rem}
+#tutoTout{text-align:center;font-weight:800;background:linear-gradient(180deg,#5cb0ff,#3d8ce0);
+  color:#04101f;border-color:#6bb8ff;margin:0.75rem 0}
+.tutochap span:first-child{margin-right:0.375rem}
+body.entuto #combat{z-index:100}
+@keyframes tutoPulse{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes tutoApparait{from{opacity:0}to{opacity:1}}
+@keyframes tutoEntre{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes tutoHibou{0%,100%{transform:rotate(0)}10%{transform:rotate(-8deg)}20%{transform:rotate(6deg)}30%{transform:rotate(0)}}
+@media (max-width:600px){ #tutoTexte{font-size:0.8125rem;max-height:40vh} }

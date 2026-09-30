@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banc de test de l'IA</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#070c16;color:#e4ecf9;margin:0;padding:1.5rem}
+  h1{margin:0 0 .25rem} p{color:#8fa3c4}
+  #score{font-size:1.4rem;font-weight:800;margin:1rem 0}
+  table{border-collapse:collapse;width:100%;max-width:60rem}
+  td,th{padding:.35rem .6rem;border-bottom:1px solid #22304a;text-align:left;font-size:.9rem}
+  .ok{color:#4ad991} .ko{color:#ff6f6f;font-weight:700}
+  code{background:#141d31;padding:.1rem .35rem;border-radius:.3rem}
+</style>
+</head>
+<body>
+<h1>🧪 Banc de test de l'IA</h1>
+<p>Chaque ligne est une phrase qu'un joueur pourrait écrire à un dirigeant, avec ce que l'IA <b>doit</b> comprendre.
+Ouvre cette page après chaque modification de <code>ia.js</code>, <code>ia-gestion.js</code> ou <code>ia-oral.js</code> :
+si une ligne devient rouge, tu as cassé quelque chose. Pour ajouter un test, ajoute une ligne dans la liste <code>CAS</code> en bas du fichier.</p>
+<div id="score"></div>
+<table><thead><tr><th>Phrase</th><th>Attendu</th><th>Compris</th><th></th></tr></thead><tbody id="lignes"></tbody></table>
+
+<script>
+  // un monde minuscule : l'IA a seulement besoin de connaître le nom d'une nation
+  var S = {nations: [{nom:'Karthag', id:2}], tiles: new Map(), mois: 0};
+</script>
+<script src="../icons.js"></script>
+<script src="../diplomatie.js"></script>
+<script src="../ia.js"></script>
+<script src="../ia-gestion.js"></script>
+<script src="../ia-oral.js"></script>
+<script src="../negociation.js"></script>
+<script>
+var CAS = [ ["donne moi de 25 or","DEMANDE_OR"],["donnes moi 25 or","DEMANDE_OR"],["tu me donnes 25 or","DEMANDE_OR"],["tu peux me donner 25 or","DEMANDE_OR"],["donne 25 or","DEMANDE_OR"],["tu me dois 100 or","DEMANDE_OR"],["tu m offres 50 or ?","DEMANDE_OR"],["je donne 25 or","OFFRE_OR"],["je vais te donner 50 or","OFFRE_OR"],["je peux te verser 30 or","OFFRE_OR"],["laisse nous passer","PASSAGE"],
+
+ ["je veux la paix","PAIX"],["on fait la paix stp","PAIX"],["fais la pé","PAIX"],["paix ?","PAIX"],
+ ["donne moi 200 or","DEMANDE_OR"],["file moi 100 or","DEMANDE_OR"],["passe moi de l'or","DEMANDE_OR"],["tu peux me preter 50 or","DEMANDE_OR"],["j'ai besoin d'or","DEMANDE_OR"],
+ ["je te donne 100 or","OFFRE_OR"],["tiens 50 or","OFFRE_OR"],["cadeau : 100 or","OFFRE_OR"],
+ ["je vais t'attaquer si tu refuses","MENACE"],["arrete la guerre ou je te detruit","MENACE"],["fais gaffe a toi","MENACE"],["je vais t'exploser","MENACE"],["tu vas le regretter","MENACE"],
+ ["t nul","INSULTE"],["t'es nul","INSULTE"],["espece de noob","INSULTE"],["ferme la","INSULTE"],["tu pues","INSULTE"],["ta gueule","INSULTE"],["t'es trop bete","INSULTE"],
+ ["ca va ?","SALUT"],["slt","SALUT"],["wesh","SALUT"],["yo","SALUT"],["coucou","SALUT"],["bonjour","SALUT"],["cc cv ?","SALUT"],
+ ["tu veux etre mon allié ?","ALLIANCE"],["on s'allie ?","ALLIANCE"],["alliance ?","ALLIANCE"],["tu veux qu on soit potes","PACTE"],
+ ["échangeons du fer contre de l'or","COMMERCE"],["on fait du commerce ?","COMMERCE"],
+ ["rejoins moi contre Karthag","AIDE_GUERRE"],["aide moi a battre Karthag","AIDE_GUERRE"],
+ ["desolé pour la guerre","EXCUSE"],["dsl","EXCUSE"],["pardon","EXCUSE"],
+ ["t'es trop fort","COMPLIMENT"],["bien joué","COMPLIMENT"],
+ ["oui","ACCORD"],["ok","ACCORD"],["vas y","ACCORD"],["deal","ACCORD"],["ça marche","ACCORD"],
+ ["non","REFUS"],["nan","REFUS"],["pas question","REFUS"],["jamais de la vie","REFUS"],
+ ["je te declare la guerre","GUERRE"],
+ ["merci","GRATITUDE"],["mrc","GRATITUDE"],["bye","ADIEU"],["a plus","ADIEU"],
+ ["pacte de non agression ?","PACTE"],
+ ["comment va ton pays","ETAT"],
+];
+var ok = 0, h = '';
+for (var c of CAS) {
+  var r = comprendre(c[0], {}, 'diplo');
+  var compris = r.score >= 0.35 || r.regle;
+  var bon = r.acte === c[1] && compris;
+  if (bon) ok++;
+  h += '<tr><td>' + c[0] + '</td><td>' + c[1] + '</td><td>' + (compris ? r.acte : '(incompris)') + '</td>'
+     + '<td class="' + (bon ? 'ok">✔' : 'ko">✘') + '</td></tr>';
+}
+document.getElementById('lignes').innerHTML = h;
+var s = document.getElementById('score');
+s.textContent = (ok === CAS.length ? '✅ ' : '❌ ') + ok + ' / ' + CAS.length + ' phrases bien comprises';
+s.className = ok === CAS.length ? 'ok' : 'ko';
+</script>
+</body>
+</html>

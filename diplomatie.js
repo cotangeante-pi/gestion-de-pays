@@ -47,6 +47,7 @@ function ajouterMsg(n, de, txt, meta){
   n.chat.push({de, txt, mois:S.mois, meta:meta||null});
   if(n.chat.length > 60) n.chat.splice(0, n.chat.length-60);
   if(de === 'eux' && S.chatOuvert !== n.id) n.nonLus++;
+  if(typeof SON !== 'undefined') SON.jouer(de === 'eux' ? 'message' : 'envoi');
 }
 
 

@@ -1244,6 +1244,7 @@ function repondreConseil(txt){
 async function envoyerAuConseil(txt){
   const C = etatConseil();
   C.chat.push({de:'moi', txt, mois:S.mois});
+  if(typeof SON !== 'undefined') SON.jouer('envoi');
   C.ecrit = true; majUI();
   await new Promise(r => setTimeout(r, 260 + Math.random()*380));
   let rep;
@@ -1252,5 +1253,6 @@ async function envoyerAuConseil(txt){
   C.ecrit = false;
   C.chat.push({de:'eux', txt:rep, mois:S.mois});
   if(C.chat.length > 60) C.chat.splice(0, C.chat.length-60);
+  if(typeof SON !== 'undefined') SON.jouer('message');
   majUI();
 }

@@ -179,6 +179,9 @@ function nombreAccole(mots, motif){
 function comprendre(txt, n, domaine, sansDecoupe){
   let propre = ' ' + sansAccents(txt).replace(/[^a-z0-9%?!]+/g,' ') + ' ';
   for(const [ex, rem] of EXPRESSIONS) propre = propre.replace(ex, rem);
+  // langage parlé : « slt », « t nul », « ok », « nan »… (ia-oral.js)
+  if(typeof EXPRESSIONS_ORAL !== 'undefined')
+    for(const [ex, rem] of EXPRESSIONS_ORAL) propre = propre.replace(ex, rem);
   // tournures propres au Conseil : « a quoi sert », « combien j ai », « la plus riche »…
   if(domaine === 'conseil' && typeof EXPRESSIONS_CONSEIL !== 'undefined')
     for(const [ex, rem] of EXPRESSIONS_CONSEIL) propre = propre.replace(ex, rem);

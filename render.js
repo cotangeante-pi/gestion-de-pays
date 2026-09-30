@@ -774,7 +774,7 @@ function infobulle(e){
 function clicCarte(e){
   const r = cv.getBoundingClientRect();
   const t = tuileSous(e.clientX-r.left, e.clientY-r.top);
-  if(t){ S.sel = t; ongletActif('province'); majUI(); }
+  if(t){ S.sel = t; ongletActif('province'); majUI(); if(typeof SON !== 'undefined') SON.jouer('selection'); }
 }
 
 let camCible = null;
