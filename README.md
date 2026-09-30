@@ -92,9 +92,11 @@ ramené à la langue du lexique avant l'analyse : « slt », « ok », « nan »
 « dsl », « t nul », « file moi 100 thunes », « je vais t'exploser »…
 Un banc de 60 phrases (`tests/banc-ia.html`) vérifie tout cela d'un coup d'œil.
 
-**Raisonner.** Aucun seuil écrit à la main : chaque dirigeant mesure l'état du
-monde tel qu'il le voit, projette l'état qui résulterait de chaque option, et
-choisit celle qui maximise son utilité. Le prix d'une contre-proposition est son
+**Raisonner.** En conversation, pas de seuil d'acceptation écrit à la main :
+chaque dirigeant mesure l'état du monde tel qu'il le voit, projette l'état qui
+résulterait de chaque option, et choisit celle qui maximise son utilité. (Le
+reste du jeu a, lui, ses seuils fixés — les buts des victoires, le tempérament
+des IA.) Le prix d'une contre-proposition est son
 point d'indifférence, majoré de sa marge.
 
 **Négocier.** Les ultimatums sont lus comme des propositions structurées
@@ -146,7 +148,10 @@ leurs ouvrages, produisent et dépensent leur recherche, subissent les mêmes
 la Couronne — chaque option chiffrée selon l'état de leur pays — puis y ajoutent
 leur caractère : un conquérant arme davantage, un prudent bâtit. Ils nouent entre
 eux commerce, pactes et alliances, poussent un front déjà entamé plutôt que
-d'attaquer au hasard, et demandent la paix quand ils perdent.
+d'attaquer au hasard, et demandent la paix quand ils perdent. Avec toi, la paix
+ne se force pas et ne se tire pas au sort : elle se négocie. Le bouton de
+l'onglet Diplomatie ouvre la conversation, et quand un dirigeant veut la paix, il
+te l'écrit avec ses raisons ; dans les deux cas le temps s'arrête pour discuter.
 
 Chaque nation part sans technologie ; une recherche de base, portée par la
 population, permet de découvrir l'Écriture puis de bâtir des universités.
@@ -174,15 +179,52 @@ toutes les cours et met ta tête à prix : **5000 or à qui t'arrache une
 province**, pour la durée qu'il restait au contrat. Les autres nations
 deviennent nettement plus entreprenantes pendant ce temps.
 
+## Armées sur la carte
+
+L'armée n'est plus un compteur : elle se répartit en **corps d'armée** posés sur
+des provinces, visibles sur la carte (une bannière et un effectif). On leur donne
+une destination d'un clic ; ils marchent d'une case par mois — deux pour une
+troupe montée, sur une route ou avec la Logistique — chez soi, chez un allié ou
+sur une terre libre. Une province ennemie, en guerre, est assaillie à l'arrivée.
+Une province n'est défendue que par les corps qui s'y tiennent, par sa milice et
+par ses murs ; les corps voisins la soutiennent pour un quart de leur force. Loin
+de ses terres, faute de ravitaillement, un corps s'use chaque mois. L'IA mène ses
+armées avec les mêmes règles : une armée principale marche au front et frappe là
+où c'est faible, ses recrues la rejoignent, une garde reste à la capitale.
+
 ## Batailles
 
-Une lunette de campagne s'ouvre sur chaque assaut qui te concerne : deux lignes
-de bannières de part et d'autre d'un front qui glisse vers sa position réelle,
-les fortifications qui cèdent ou tiennent, les rangs qui s'éclaircissent selon
-les pertes effectives. Rien de sanglant — des enseignes et un front. Le temps du
-royaume ralentit à 12 % pendant l'action : un assaut ne coûte plus des mois de
-règne. Si un second assaut survient pendant que tu regardes, le cadre bat en
-rouge, un carillon discret sonne, et le combat est mis en file.
+Chaque assaut se livre en **trois phases** : **bombardement** (artillerie,
+aviation, flotte sur une côte — pertes, et une brèche dans les fortifications),
+**mêlée** (le gros des troupes contre la garnison, la milice et ce qui reste des
+murs) et **poursuite** (cavalerie, chars et aviation du vainqueur achèvent la
+déroute). Le hasard ne pèse que de ±7 % ; la composition et le terrain décident.
+
+Une lunette de campagne illustre chaque assaut qui te concerne : le terrain de la
+province, les murs qui se lézardent sous les obus, chaque type d'unité avec sa
+silhouette — fantassins, cavaliers, canons, chars, avions, navires — la ligne de
+front qui glisse, les tombés qui s'estompent, puis la poursuite. Rien de
+sanglant. Le temps du royaume ralentit à 12 % pendant l'action ; un second assaut
+fait battre le cadre en rouge et se met en file.
+
+## Contenu
+
+- **8 unités** : milice, infanterie, cavalerie, fusiliers, artillerie, chars,
+  aviation, marine — chacune avec son rôle dans les trois phases.
+- **13 bâtiments** : ferme, mine, port, usine, centrale, université, caserne,
+  marché, route, entrepôt, hôpital, arsenal, théâtre.
+- **20 technologies** en quatre branches — savoir, société, économie, guerre.
+
+## Le début de partie
+
+L'Écriture ne coûte plus que 30 points, et la capitale entretient ses scribes
+(+2 de recherche) : elle arrive vers le septième mois. Six **missions de départ**
+— quatre provinces, une mine, l'Écriture, une découverte, deux provinces gardées,
+un premier accord — donnent chacune une récompense pendant les trois premières
+années, à toi comme à l'IA. Des **découvertes** sont semées sur les terres libres
+et marquées sur la carte : des ruines (or ou savoir), des tribus (des habitants
+qui se joignent à toi), des gisements (+3 matériaux par mois). Coloniser devient
+un choix.
 
 ## Interface
 
@@ -205,6 +247,8 @@ l'interface, ni en donnant l'ordre au Conseil.
 | | |
 |---|---|
 | `game.js` | état du monde, économie, guerre, IA, interface |
+| `armees.js` | corps d'armée, marches, ravitaillement, batailles en trois phases, IA militaire |
+| `debut.js` | missions de départ et découvertes sur les terres libres |
 | `victoire.js` | victoires anticipées, score de civilisation, fin de partie |
 | `render.js`, `relief.js` | rendu de la carte et du relief |
 | `ia.js` | compréhension, raisonnement, génération de parole |
@@ -217,7 +261,7 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `alliance.js` | plaidoirie, contrat daté, prime de trahison |
 | `composeur.js` | négociation au clic, traduite en phrases |
 | `sdk.js` | adaptateur de plateforme, facultatif |
-| `bataille-ecran.js` | lunette de campagne et ralenti du temps |
+| `bataille-ecran.js` | lunette de campagne : la bataille illustrée en trois phases |
 | `conseil.js` | Conseil de la Couronne |
 | `son.js` | sons composés à la volée et petite voix |
 | `intro.js` | scène d'introduction et dézoom vers la carte |

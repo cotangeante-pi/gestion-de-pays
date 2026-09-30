@@ -29,33 +29,66 @@ const BUILDINGS = {
   universite: {nom:'Université',   or:160, mat:50, up:4, tech:'ecriture',
                desc:'+4 recherche, +bonheur', eff:{sci:4, bonheur:2}},
   caserne:    {nom:'Caserne',      or:110, mat:45, up:3, tech:null,
-               desc:'+20 défense, recrutement +50%', eff:{def:20}},
+               desc:'+20 % de défense à la province', eff:{def:20}},
+  marche:     {nom:'Marché',       or:100, mat:30, up:1, tech:'commerce',
+               desc:'+5 or', eff:{gold:5}},
+  route:      {nom:'Route',        or:70,  mat:40, up:1, tech:'construction',
+               desc:'+1 or ; les armées y gagnent une case de marche', eff:{gold:1}},
+  entrepot:   {nom:'Entrepôt',     or:80,  mat:20, up:1, tech:'construction',
+               desc:'+2 nourriture, +3 matériaux', eff:{food:2, mat:3}},
+  hopital:    {nom:'Hôpital',      or:140, mat:50, up:3, tech:'medecine',
+               desc:'+2 bonheur ; la province croît de 30 % plus vite, les épidémies y frappent moins', eff:{bonheur:2}},
+  arsenal:    {nom:'Arsenal',      or:150, mat:80, up:3, tech:'metallurgie',
+               desc:'+10 % de défense ; toutes tes recrues coûtent 20 % de moins', eff:{def:10}},
+  theatre:    {nom:'Théâtre',      or:130, mat:40, up:3, tech:'philosophie',
+               desc:'+4 bonheur, +1 recherche', eff:{bonheur:4, sci:1}},
 };
 
 const TECHS = {
-  ecriture:   {nom:'Écriture',        cout:60,  req:[],                    desc:'Débloque Université'},
-  navigation: {nom:'Navigation',      cout:90,  req:['ecriture'],          desc:'Débloque Port, +colonisation'},
-  agronomie:  {nom:'Agronomie',       cout:140, req:['ecriture'],          desc:'+50% nourriture des fermes'},
-  industrie:  {nom:'Industrie',       cout:220, req:['navigation'],        desc:'Débloque Usine et Centrale'},
-  fiscalite:  {nom:'Fiscalité',       cout:200, req:['ecriture'],          desc:'+25% revenus d\'impôts'},
-  medecine:   {nom:'Médecine',        cout:260, req:['agronomie'],         desc:'+50% croissance démographique'},
-  poudre:     {nom:'Poudre à canon',  cout:300, req:['industrie'],         desc:'+40% puissance militaire'},
-  electricite:{nom:'Électricité',     cout:380, req:['industrie'],         desc:'+6 énergie par centrale'},
-  informatique:{nom:'Informatique',   cout:520, req:['electricite','fiscalite'], desc:'+60% recherche'},
-  nucleaire:  {nom:'Nucléaire',       cout:700, req:['poudre','informatique'], desc:'+80% puissance militaire'},
+  // savoir
+  ecriture:   {nom:'Écriture',        cout:30,  req:[],                      branche:'savoir',   desc:'Débloque Université'},
+  mathematiques:{nom:'Mathématiques', cout:100, req:['ecriture'],            branche:'savoir',   desc:'+20 % de recherche'},
+  philosophie:{nom:'Philosophie',     cout:140, req:['ecriture'],            branche:'savoir',   desc:'Débloque Théâtre'},
+  imprimerie: {nom:'Imprimerie',      cout:260, req:['philosophie','mathematiques'], branche:'savoir', desc:'+25 % de recherche'},
+  informatique:{nom:'Informatique',   cout:520, req:['electricite','fiscalite'], branche:'savoir', desc:'+60% recherche'},
+  // société
+  construction:{nom:'Construction',   cout:45,  req:[],                      branche:'societe',  desc:'Débloque Route et Entrepôt'},
+  agronomie:  {nom:'Agronomie',       cout:140, req:['ecriture'],            branche:'societe',  desc:'+50% nourriture des fermes'},
+  navigation: {nom:'Navigation',      cout:90,  req:['ecriture'],            branche:'societe',  desc:'Débloque Port, +colonisation'},
+  medecine:   {nom:'Médecine',        cout:260, req:['agronomie'],           branche:'societe',  desc:'+50% croissance démographique, débloque Hôpital'},
+  // économie
+  commerce:   {nom:'Commerce',        cout:110, req:['ecriture'],            branche:'economie', desc:'Débloque Marché'},
+  fiscalite:  {nom:'Fiscalité',       cout:200, req:['ecriture'],            branche:'economie', desc:'+25% revenus d\'impôts'},
+  banque:     {nom:'Banque',          cout:300, req:['commerce','fiscalite'], branche:'economie', desc:'+15 % de revenus'},
+  industrie:  {nom:'Industrie',       cout:220, req:['navigation'],          branche:'economie', desc:'Débloque Usine et Centrale'},
+  electricite:{nom:'Électricité',     cout:380, req:['industrie'],           branche:'economie', desc:'+6 énergie par centrale'},
+  // guerre
+  equitation: {nom:'Équitation',      cout:50,  req:[],                      branche:'guerre',   desc:'Débloque Cavalerie'},
+  metallurgie:{nom:'Métallurgie',     cout:150, req:['construction'],        branche:'guerre',   desc:'Débloque Fusiliers et Arsenal'},
+  poudre:     {nom:'Poudre à canon',  cout:300, req:['industrie'],           branche:'guerre',   desc:'+25 % de puissance militaire, débloque Artillerie'},
+  tactique:   {nom:'Tactique',        cout:340, req:['poudre'],              branche:'guerre',   desc:'+15 % dans la mêlée'},
+  logistique: {nom:'Logistique',      cout:320, req:['industrie','construction'], branche:'guerre', desc:'Armées : +1 case par mois, usure divisée par deux'},
+  nucleaire:  {nom:'Nucléaire',       cout:700, req:['poudre','informatique'], branche:'guerre', desc:'+80% puissance militaire'},
 };
+const BRANCHES = {savoir:'Savoir', societe:'Société', economie:'Économie', guerre:'Guerre'};
 
 const UNITES = {
+  milice:     {nom:'Milice',     or:25,  mat:5,   up:0.25, att:2,  def:5,  hommes:800,  tech:null,
+               desc:'Levée à bas prix : tient une province, mais ne mène pas un assaut.'},
   infanterie: {nom:'Infanterie', or:45,  mat:15,  up:0.5, att:4,  def:6,  hommes:1000, tech:null,
-               desc:'Bon marché, solide en défense.'},
+               desc:'Le gros des armées : bon marché, solide en défense.'},
+  cavalerie:  {nom:'Cavalerie',  or:90,  mat:30,  up:0.9, att:8,  def:4,  hommes:500,  tech:'equitation',
+               desc:'Rapide (une case de plus par mois) ; redoutable dans la poursuite.'},
+  fusiliers:  {nom:'Fusiliers',  or:110, mat:50,  up:1.1, att:9,  def:10, hommes:900,  tech:'metallurgie',
+               desc:'Infanterie bien armée : solide à l\'assaut comme en défense.'},
   artillerie: {nom:'Artillerie', or:170, mat:90,  up:1.6, att:14, def:3,  hommes:300,  tech:'poudre',
-               desc:'Frappe fort, fragile si prise à revers.'},
+               desc:'Bombarde avant l\'assaut : ouvre une brèche dans les fortifications.'},
   chars:      {nom:'Chars',      or:260, mat:140, up:2.4, att:20, def:14, hommes:200,  tech:'industrie',
-               desc:'Fer de lance des offensives terrestres.'},
+               desc:'Rapides et lourds : percent la ligne, puis poursuivent.'},
   avions:     {nom:'Aviation',   or:380, mat:190, up:3.5, att:26, def:7,  hommes:60,   tech:'electricite',
-               desc:'Ignore une partie des fortifications ennemies.'},
+               desc:'Bombarde, poursuit, et contourne une partie des fortifications.'},
   navires:    {nom:'Marine',     or:300, mat:160, up:2.8, att:12, def:12, hommes:400,  tech:'navigation',
-               desc:'+25% d\'attaque sur les provinces côtières.'},
+               desc:'Porte 3 unités chacun ; bombarde les provinces côtières.'},
 };
 const CLES_UNITES = Object.keys(UNITES);
 
@@ -185,7 +218,7 @@ function reprendreCapitale(n, tuile){
   else logue(`${ic('paix')} <b>${n.nom}</b> reprend sa capitale.`);
 }
 
-const armeeVide = ()=> ({infanterie:0, artillerie:0, chars:0, avions:0, navires:0});
+const armeeVide = ()=> Object.fromEntries(CLES_UNITES.map(k => [k, 0]));
 const nbUnites  = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0),0);
 const effectifs = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].hommes,0);
 const coutUp    = a => CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].up,0);
@@ -406,7 +439,7 @@ function genererMonde(cfg = CONFIG){
       rel:{}, guerre:new Set(), allies:new Set(), pacte:new Set(),
       agressivite:rnd(0.15,0.8), capitale:best,
     };
-    n.commerce = new Set();
+    n.commerce = new Set(); n.corps = []; n.missions = new Set();
     if(i>0) initDiplomatie(n, i);
     S.nations.push(n);
     if(i===0) S.player=n;
@@ -418,6 +451,8 @@ function genererMonde(cfg = CONFIG){
   // relations initiales
   for(const a of S.nations) for(const b of S.nations)
     if(a!==b) a.rel[b.id] = ri(-10,25);
+  // des découvertes attendent sur les terres libres : ruines, tribus, gisements
+  if(typeof semerDecouvertes === 'function') semerDecouvertes();
 
 }
 
@@ -454,7 +489,7 @@ function bilan(n){
     const occ = t.occ ? 1 - t.occ.val*0.85 : 1;   // une province envahie ne produit presque plus
     pop += t.pop;
     food += (T0.food + t.pop*0.05)*occ;
-    mat  += T0.mat*0.5*occ;
+    mat  += T0.mat*0.5*occ + (t.gisement ? 3*occ : 0);   // un gisement découvert en colonisant
     if(nbBatiments(t)){
       const e = effetsProvince(t, n);
       upkeep  += e.up;
@@ -471,7 +506,10 @@ function bilan(n){
   // des lettrés vivent dans toute population : sans eux, l'Écriture — et donc
   // l'Université — restait hors d'atteinte pour qui partait sans technologie
   sci += 1.5 + pop*0.05;
-  sci  *= aTech(n,'informatique')?1.6:1;
+  // les scribes de la cour : la capitale entretient ses lettrés
+  if(n.capitale && n.capitale.owner === n.id) sci += 2;
+  sci  *= (aTech(n,'informatique')?1.6:1) * (aTech(n,'mathematiques')?1.2:1) * (aTech(n,'imprimerie')?1.25:1);
+  if(aTech(n,'banque')) gold *= 1.15;
   const conso = pop*0.35;
   const penurieEnergie = energie<0;
   if(penurieEnergie){ gold*=0.6; sci*=0.6; }
@@ -491,6 +529,12 @@ function multMilitaire(n){
 function forceAtt(a,n){ return CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].att,0)*multMilitaire(n); }
 function forceDef(a,n){ return CLES_UNITES.reduce((s,k)=>s+(a[k]||0)*UNITES[k].def,0)*multMilitaire(n); }
 function puissance(n){ return (forceAtt(n.armee,n)+forceDef(n.armee,n))/2; }
+
+// prix réel d'une recrue : un arsenal, n'importe où dans le pays, le baisse de 20 %
+function coutUnite(n, k){
+  const U = UNITES[k], r = tuilesDe(n).some(t => aBatiment(t, 'arsenal')) ? 0.8 : 1;
+  return {or: Math.round(U.or*r), mat: Math.round(U.mat*r)};
+}
 
 // unités disponibles pour une nation (tech débloquée)
 const uniteDispo = (n,k)=> !UNITES[k].tech || n.tech.has(UNITES[k].tech);
@@ -551,7 +595,8 @@ function tickMois(){
                  * (n.bonheur>50?1:0.5);
     for(const t of ts){
       const capMax = 10 + TERRAIN[t.terr].hab*22 + (aBatiment(t,'ferme')?15:0);
-      t.pop = clamp(t.pop + t.pop*croiss + (t.pop<capMax?0.05:-0.05), 0.5, capMax);
+      const soins = aBatiment(t,'hopital') && croiss > 0 ? 1.3 : 1;
+      t.pop = clamp(t.pop + t.pop*croiss*soins + (t.pop<capMax?0.05:-0.05), 0.5, capMax);
     }
 
     // recherche : les mêmes règles pour tous, IA comprises
@@ -569,8 +614,10 @@ function tickMois(){
       if(n.joueur) logue(`${ic('or')} Caisses vides : des unités sont dissoutes faute de solde !`,'bad');
     }
 
+    if(typeof armeesMois === 'function') armeesMois(n);
     if(!n.joueur) iaJoue(n, b);
   }
+  if(typeof suivreMissions === 'function') suivreMissions();
 
   majOccupations();
   // disparue de la carte, disparue de la messagerie : ses non-lus ne comptent plus
@@ -607,7 +654,8 @@ function iaJoue(n, b){
   for(let k = 0; k < 2 && nbUnites(n.armee) < voulue; k++){
     const u = iaMeilleureUnite(n, reserve, bilan(n));
     if(!u) break;
-    n.or -= UNITES[u].or; n.mat -= UNITES[u].mat; n.armee[u]++;
+    const prix = coutUnite(n, u);
+    n.or -= prix.or; n.mat -= prix.mat; n.armee[u]++;
   }
 
   // 3. économie : les trois actions les plus rentables, sans vider les caisses
@@ -647,17 +695,8 @@ function iaJoue(n, b){
       .sort((a, c) => puissance(a) - puissance(c));
     if(cibles.length) declarerGuerre(n, cibles[0]);
   }
-  // attaquer : on pousse le front déjà entamé, sinon la province la moins défendue
-  if(n.guerre.size && nbUnites(n.armee) > 3 && Math.random() < 0.45){
-    const front = tuilesDe(n).flatMap(voisins)
-      .filter(v=>v && v.owner!==null && v.owner!==n.id && n.guerre.has(v.owner));
-    if(front.length){
-      const cout = t => (t.occ && t.occ.par === n.id ? -100*t.occ.val : 0)
-                      + TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
-      const c = front.sort((a, d) => cout(a) - cout(d))[0];
-      bataille(n, S.nations[c.owner], c, 0.6);
-    }
-  }
+  // mener ses armées : marcher au front, frapper là où c'est faible (armees.js)
+  if(typeof iaArmees === 'function') iaArmees(n);
   // expéditions maritimes
   if(typeof iaMarine === 'function') iaMarine(n);
   // faire la paix : quand on perd, quand le peuple n'en peut plus
@@ -668,18 +707,54 @@ function iaJoue(n, b){
     if((perd && Math.random() < 0.2) || (las && Math.random() < 0.15) || Math.random() < 0.02)
       faireLaPaix(n, o);
   }
-  if(n.guerre.has(S.player.id) && Math.random() < 0.04
-     && (puissance(S.player) > puissance(n)*1.25 || n.bonheur < 30)) faireLaPaix(n, S.player);
+  iaProposePaix(n);
+}
+
+// Avec le joueur, la paix n'est jamais tirée au sort : le dirigeant qui la veut
+// l'écrit, avec ses raisons, et le temps s'arrête pour qu'on en discute.
+// C'est ensuite la conversation — le même moteur de décision — qui la conclut ou non.
+function iaProposePaix(n){
+  const p = S.player;
+  if(!n.guerre.has(p.id) || S.mois - (n.paixProposee ?? -99) < 12) return;
+  // on ne demande pas la paix le mois même où la guerre commence
+  if(S.mois - ((n.debutGuerre || {})[p.id] ?? -99) < 6) return;
+  const perd = puissance(p) > puissance(n)*1.25;
+  const las  = n.bonheur < 35;
+  const occupe = tuilesDe(n).some(t => t.occ && t.occ.par === p.id && t.occ.val > 0.4);
+  if(!perd && !las && !occupe) return;
+  n.paixProposee = S.mois;
+  const raisons = [];
+  if(perd)   raisons.push('tes armées pèsent plus lourd que les miennes');
+  if(occupe) raisons.push('tes troupes tiennent déjà une part de mes terres');
+  if(las)    raisons.push('mon peuple est las de cette guerre');
+  const A = typeof appel === 'function' ? appel(n) : 'voisin';
+  ajouterMsg(n, 'eux', `Je te propose la paix, ${A}. Je ne m'en cache pas : ${raisons.join(', ')}. `
+    + `Dis-moi à quelles conditions tu l'accepterais — ou refuse, et nous continuerons.`);
+  // une offre en bonne et due forme : « d'accord » la conclut, un refus la laisse tomber,
+  // et tout le reste — exiger de l'or, une province — passe par la négociation habituelle
+  n.negociation = {action:'PAIX', demande:0, reserve:0, mois:S.mois, concessions:0};
+  logue(`${ic('paix')} <b>${n.nom}</b> te propose la paix. Le temps s'arrête pour en discuter.`, 'good');
+  discuterPaix(n);
+}
+
+// ouvre la conversation avec n et fige le temps : on ne négocie pas une paix au pas de course
+function discuterPaix(n){
+  if(!n || tuilesDe(n).length === 0) return;
+  if(typeof TUTO !== 'undefined' && TUTO.actif) return;      // le tutoriel garde la main
+  S.paused = true; majVitesse();
+  S.chatOuvert = n.id; n.nonLus = 0;
+  ongletActif('chat');
+  majUI();
 }
 
 // la meilleure unité qu'on puisse payer et entretenir
 function iaMeilleureUnite(n, reserve, b){
   let best = null, score = -1;
   for(const k of CLES_UNITES){
-    const U = UNITES[k];
-    if(!uniteDispo(n, k) || n.or - U.or < reserve || n.mat < U.mat) continue;
+    const U = UNITES[k], prix = coutUnite(n, k);
+    if(!uniteDispo(n, k) || n.or - prix.or < reserve || n.mat < prix.mat) continue;
     if(b.net - U.up < 1) continue;                // pas d'armée qu'on ne pourrait pas solder
-    const s = (U.att*(0.4 + n.agressivite) + U.def*(1.2 - n.agressivite*0.6)) / (U.or + U.mat*0.6);
+    const s = (U.att*(0.4 + n.agressivite) + U.def*(1.2 - n.agressivite*0.6)) / (prix.or + prix.mat*0.6);
     if(s > score){ score = s; best = k; }
   }
   return best;
@@ -712,6 +787,7 @@ function declarerGuerre(a,b){
     romprAlliance(b, true);              // met ta tête à prix
   if(a.joueur && b.pacte && b.pacte.has(a.id) && typeof signalerTrahison === 'function') signalerTrahison(b);
   a.guerre.add(b.id); b.guerre.add(a.id);
+  (a.debutGuerre = a.debutGuerre || {})[b.id] = S.mois; (b.debutGuerre = b.debutGuerre || {})[a.id] = S.mois;
   a.allies.delete(b.id); b.allies.delete(a.id);
   a.rel[b.id]=-60; b.rel[a.id]=-60;
   for(const o of S.nations){ if(o!==a && o!==b) o.rel[a.id]-=6; }
@@ -728,86 +804,7 @@ function faireLaPaix(a,b){
   else logue(`${ic('paix')} Au loin : <b>${a.nom}</b> et <b>${b.nom}</b> font la paix.`);
 }
 
-function bataille(att, def, tuile, frac, debarquement){
-  if(!def) return;
-  const corps = detacher(att.armee, frac);
-  const nb = nbUnites(corps);
-  if(nb<1){ if(att.joueur) logue(debarquement
-      ? 'Aucune troupe embarquable : il faut des navires pour porter les hommes.'
-      : 'Aucune unité disponible pour cet assaut.','bad'); return; }
-
-  const fortif = TERRAIN[tuile.terr].def + (aBatiment(tuile,'caserne')?20:0) + tuile.fort;
-  const partAir = (corps.avions||0)/nb;              // l'aviation contourne les fortifications
-  const fortEff = fortif * (1 - 0.55*partAir);
-
-  let fA = forceAtt(corps, att);
-  if(tuile.terr==='cote' && corps.navires>0) fA *= 1.25;
-  // une tête de pont se paie : on débarque sans artillerie en position ni terrain connu
-  if(debarquement) fA *= 0.70;
-  const fD = (forceDef(def.armee, def) + 25) * (1 + fortEff/100);
-
-  const rA = fA*rnd(0.82,1.18), rD = fD*rnd(0.82,1.18);
-  const gagne = rA > rD, ratio = rA/(rA+rD);
-
-  const pertesA = appliquerPertes(corps, clamp(gagne? 0.30-ratio*0.22 : 0.45-ratio*0.2, 0.05, 0.6));
-  const pertesD = appliquerPertes(def.armee, clamp(gagne? ratio*0.38 : 0.20-ratio*0.1, 0.02, 0.5));
-  for(const k of CLES_UNITES) att.armee[k] += corps[k];   // les survivants rentrent
-
-  const occAvant = (tuile.occ && tuile.occ.par === att.id) ? tuile.occ.val : 0;
-  // --- avancée du front : on ne prend pas une province d'un seul coup ---
-  if(!tuile.occ || tuile.occ.par !== att.id) tuile.occ = {par:att.id, val:0, mois:S.mois};
-  const gain = gagne ? clamp(0.14 + (ratio-0.5)*0.8, 0.08, 0.42)
-                     : -clamp(0.05 + (0.5-ratio)*0.35, 0.02, 0.22);
-  tuile.occ.val = clamp(tuile.occ.val + gain, 0, 1);
-  tuile.occ.mois = S.mois;
-
-  let txt, conquise = false;
-  if(tuile.occ.val >= 1){
-    const etaitAuJoueur = def.joueur;
-    const etaitCapitale = (def.capitale === tuile);
-    const reprise = (att.ancienneCapitale === tuile);
-    tuile.owner = att.id; tuile.pop *= 0.85; tuile.fort = 0; tuile.occ = null;
-    if(etaitCapitale) deplacerCapitale(def, tuile);
-    if(reprise) reprendreCapitale(att, tuile);
-    if(typeof oublierMer === 'function') oublierMer();   // les côtes ont changé de main
-    // prime de trahison : le monde paie qui t'arrache une terre
-    if(etaitAuJoueur && !att.joueur && typeof primeActive === 'function' && primeActive()){
-      att.or += S.prime.montant;
-      logue(`${ic('or')} <b>${att.nom}</b> touche ${S.prime.montant} or de prime pour cette province.`, 'bad');
-    }
-    txt = 'Province conquise'; conquise = true;
-    if(att.joueur && typeof SDK !== 'undefined') SDK.moment();
-  } else {
-    const pc = Math.round(tuile.occ.val*100);
-    txt = gagne ? `Front avancé · ${pc}%` : `Assaut contenu · ${pc}%`;
-    if(tuile.occ.val <= 0) tuile.occ = null;
-  }
-
-  if(typeof fxBataille === 'function') fxBataille(tuile, att.col, def.col, gagne, txt);
-  if(typeof montrerCombat === 'function') montrerCombat({
-    tuile, att, def, gagne, conquise, debarquement,
-    occAvant, occApres: tuile.occ ? tuile.occ.val : (conquise ? 1 : 0),
-    fortif, nbA: nb, nbD: nbUnites(def.armee) + nbUnites(pertesD),
-    partA: nbUnites(pertesA) / Math.max(1, nb),
-    partD: nbUnites(pertesD) / Math.max(1, nbUnites(def.armee) + nbUnites(pertesD)),
-    verdict: conquise ? 'Province conquise' : gagne ? 'Front avancé' : 'Assaut repoussé',
-    detail: `pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`,
-  });
-
-  if(att.joueur || def.joueur){
-    const detail = `${debarquement ? 'débarquement · ' : ''}pertes ${texteArmee(pertesA)} contre ${texteArmee(pertesD)}`;
-    if(conquise){
-      logue(`${ic('paix')} <b>${att.nom}</b> achève l'occupation d'une province de <b>${def.nom}</b> · ${detail}`,
-            att.joueur?'good':'bad');
-      if(tuilesDe(def).length===0)
-        logue(`${ic('guerre')} <b>${def.nom}</b> n'existe plus.`,'bad');
-    } else {
-      logue(`${ic('attaque')} ${txt} — <b>${att.nom}</b> contre <b>${def.nom}</b> · ${detail}`,
-            (gagne === att.joueur) ? 'good' : 'bad');
-    }
-  }
-  majUI();
-}
+// la bataille — trois phases, des corps d'armée sur la carte — vit dans armees.js
 
 // le front reflue quand plus personne ne pousse
 function majOccupations(){
@@ -831,7 +828,7 @@ function evenementAleatoire(){
     if(!ts.length || Math.random() > 0.04) continue;
     const moi = n.joueur, dire = (txt, cls) => { if(moi) logue(txt, cls); };
     pick([
-      ()=>{ const t=pick(ts); t.pop*=0.8;
+      ()=>{ const t=pick(ts); t.pop*=aBatiment(t,'hopital') ? 0.92 : 0.8;
             dire(`${ic('pop')} Une épidémie frappe une province.`,'bad'); },
       ()=>{ n.or+=180; dire(`${ic('or')} Découverte d'un gisement : +180 or.`,'good'); },
       ()=>{ n.nourriture-=45; dire(`${ic('food')} Tempêtes : récoltes perdues.`,'bad'); },
@@ -995,15 +992,22 @@ function panProvince(){
       : `<button class="btn" data-colonmer="1" ${bridePause('coloniser', p.or<COUT_COLONIE_MER)}>
           ${ic('coloniser')} Fonder un comptoir outre-mer
           <span class="cost">${COUT_COLONIE_MER}${ic('or')}</span></button>`;
-  } else if(n && p.guerre.has(n.id) && voisins(t).some(v=>v.owner===p.id)){
-    const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
+  } else if(n && p.guerre.has(n.id) && (voisins(t).some(v=>v.owner===p.id) || corpsAuContact(p, t))){
+    const fortif = fortifTuile(t), contact = corpsAuContact(p, t);
+    const gar = garnisonDe(n, t);
     h += `<h3 style="margin-top:14px">Offensive</h3>
-      <div class="row"><span>Ton attaque</span><span>${forceAtt(p.armee,p).toFixed(0)}</span></div>
-      <div class="row"><span>Défense sur place</span><span>${(forceDef(n.armee,n)*(1+fortif/100)).toFixed(0)}</span></div>
-      <p class="muted">Ton armée : ${texteArmee(p.armee)}</p>`;
-    for(const pct of [25,50,100])
-      h += `<button class="btn danger" data-attaque="${pct}" ${bridePause('attaquer', nbUnites(p.armee)<1)}>
-        ${ic('guerre')} Engager ${pct}% des forces<span class="cost">${texteArmee(apercuDetachement(p.armee,pct/100))}</span></button>`;
+      <div class="row"><span>Garnison ennemie</span><span>${texteArmee(gar.u)}</span></div>
+      <div class="row"><span>Milice et murs</span><span>${milice(t).toFixed(0)} · +${fortif}%</span></div>
+      <div class="row"><span>Défense estimée</span><span>${defenseEstimee(t).toFixed(0)}</span></div>`;
+    if(contact){
+      h += `<p class="muted">Au contact : <b>${nomCorps(p, contact)}</b> — ${texteArmee(contact.u)}, attaque ${forceAtt(contact.u,p).toFixed(0)}.</p>`;
+      for(const pct of [50,100])
+        h += `<button class="btn danger" data-attaque="${pct}" ${bridePause('attaquer', nbUnites(contact.u)<1)}>
+          ${ic('guerre')} Assaillir avec ${pct}% de la ${nomCorps(p, contact)}<span class="cost">${texteArmee(apercuDetachement(contact.u,pct/100))}</span></button>`;
+    } else {
+      h += `<p class="muted">${ic('verrou')} Aucun de tes corps d'armée n'est au contact. Onglet <b>Armée</b> :
+        choisis une destination et clique sur cette province — le corps marchera puis donnera l'assaut.</p>`;
+    }
   } else if(n && p.guerre.has(n.id) && cibleNavale(p, t)){
     const m = cibleNavale(p, t), gene = obstacleNaval(p);
     const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
@@ -1024,7 +1028,15 @@ function panProvince(){
       }
     }
   }
+  const ici = typeof corpsSur === 'function' ? corpsSur(t) : [];
+  if(ici.length){
+    h += `<h3 style="margin-top:14px">Troupes sur place</h3>`;
+    for(const {n: m, c} of ici)
+      h += `<div class="row"><span><i class="flag" style="background:${m.col}"></i>${m.joueur ? nomCorps(m, c) : m.nom}</span>
+        <span>${texteArmee(c.u)}${m.joueur ? ` <button class="btn mini" data-marche="${c.id}" style="width:auto">Destination</button>` : ''}</span></div>`;
+  }
   el.innerHTML = h;
+  el.querySelectorAll('[data-marche]').forEach(b => b.onclick = () => choisirDestination(+b.dataset.marche));
 
   el.querySelectorAll('[data-build]').forEach(btn=> btn.onclick = ()=>{
     if(!actionPermise('batir')) return refuserPause();
@@ -1083,6 +1095,7 @@ function panPays(){
     <h3 style="margin-top:14px">Taux d'imposition : ${(p.taxe*100).toFixed(0)}%</h3>
     <input class="slider" type="range" min="0" max="80" value="${p.taxe*100}" id="sTaxe" ${bridePause('impot')}>
     <p class="muted">Des impôts élevés remplissent les caisses mais font chuter le bonheur.</p>
+    ${typeof htmlMissions === 'function' ? htmlMissions() : ''}
     ${typeof htmlVictoires === 'function' ? htmlVictoires() : ''}`;
   document.getElementById('sTaxe').oninput = e => {
     if(!actionPermise('impot')) return refuserPause();
@@ -1105,7 +1118,9 @@ function panTech(){
       <div class="bar"><i style="width:${clamp(p.sci/t.cout*100,0,100)}%"></i></div>
       <span class="muted">${p.sci.toFixed(0)} / ${t.cout}</span></div>`;
   }
+  let brancheCourante = null;
   for(const [k,t] of Object.entries(TECHS)){
+    if(t.branche !== brancheCourante){ brancheCourante = t.branche; h += `<h3 style="margin-top:12px">${BRANCHES[t.branche]}</h3>`; }
     const fait = p.tech.has(k);
     const ok = t.req.every(r=>p.tech.has(r));
     h += `<button class="btn" data-tech="${k}" ${bridePause('recherche', fait||!ok||p.rech===k)}>
@@ -1140,7 +1155,7 @@ function panDiplo(){
       h += `<div class="bar"><i style="width:${(rel+100)/2}%;background:${rel>=0?'#4ad991':'#ff6b6b'}"></i></div>
       <span class="muted">Relation ${rel} · ${tuilesDe(n).length} provinces · armée ${nbUnites(n.armee)} · puissance ${puissance(n).toFixed(0)}</span>`;
       if(p.guerre.has(n.id)){
-        h += `<button class="btn" data-paix="${n.id}">${ic('paix')} Proposer la paix</button>`;
+        h += `<button class="btn" data-paix="${n.id}">${ic('paix')} Négocier la paix</button>`;
       } else {
         h += `<button class="btn" data-don="${n.id}" ${bridePause('don', p.or<150)}>${ic('don')} Offrir 150 or (+15 relation)</button>
         <button class="btn" data-pacte="${n.id}" ${bridePause('pacte', p.pacte.has(n.id)||rel<15)}>${ic('pacte')} Pacte de non-agression</button>
@@ -1179,12 +1194,8 @@ function panDiplo(){
     // les alliés de la cible rejoignent la guerre
     for(const a of n.allies) if(a!==p.id && !p.guerre.has(a)) declarerGuerre(S.nations[a],p);
     majUI(); });
-  el.querySelectorAll('[data-paix]').forEach(b=>b.onclick=()=>{
-    if(!actionPermise('paix')) return refuserPause();
-    const n=N(b.dataset.paix);
-    if(puissance(p)>puissance(n)*0.8 || Math.random()<0.4) faireLaPaix(p,n);
-    else logue(`❌ ${n.nom} refuse la paix : ils se croient plus forts.`,'bad');
-    majUI(); });
+  // la paix ne s'impose pas : elle se négocie avec le dirigeant, le temps arrêté
+  el.querySelectorAll('[data-paix]').forEach(b=>b.onclick=()=> discuterPaix(N(b.dataset.paix)));
 }
 
 // ----- onglet Armée -----
@@ -1197,6 +1208,7 @@ function panArmee(){
     <div class="row"><span>Puissance d'attaque</span><span>${forceAtt(a,p).toFixed(0)}</span></div>
     <div class="row"><span>Puissance défensive</span><span>${forceDef(a,p).toFixed(0)}</span></div>
     <div class="row"><span>Solde mensuelle</span><span>${coutUp(a).toFixed(1)} ${ic('or')}</span></div>
+    ${typeof htmlCorps === 'function' ? htmlCorps() : ''}
     <h3 style="margin-top:14px">Recrutement</h3>`;
 
   for(const k of CLES_UNITES){
@@ -1213,11 +1225,11 @@ function panArmee(){
         <span title="Entretien mensuel">${ic('or')} ${u.up}/mois</span>
       </div>
       <div class="muted">${verrou?`${ic('verrou')} Requiert la technologie « `+TECHS[u.tech].nom+' »':u.desc}</div>
-      <div class="ucost">Coût unitaire : <b>${u.or}${ic('or')}</b> + <b>${u.mat}${ic('mat')}</b></div>`;
+      <div class="ucost">Coût unitaire : <b>${coutUnite(p,k).or}${ic('or')}</b> + <b>${coutUnite(p,k).mat}${ic('mat')}</b></div>`;
     if(!verrou){
       h += `<div class="ubuy">`;
       for(const q of [1,5,10]){
-        const cher = p.or < u.or*q || p.mat < u.mat*q;
+        const cher = p.or < coutUnite(p,k).or*q || p.mat < coutUnite(p,k).mat*q;
         h += `<button class="btn mini" data-buy="${k}" data-q="${q}" ${cher?'disabled':''}>+${q}</button>`;
       }
       h += `<button class="btn mini danger" data-sell="${k}" ${a[k]<1?'disabled':''}>−1</button></div>`;
@@ -1236,10 +1248,11 @@ function panArmee(){
   const el = document.getElementById('tab-armee');
   el.innerHTML = h;
   el.querySelectorAll('[data-buy]').forEach(b=> b.onclick = ()=>{
-    const k=b.dataset.buy, q=+b.dataset.q, u=UNITES[k];
-    p.or -= u.or*q; p.mat -= u.mat*q; p.armee[k] += q;
-    logue(`${ic('infanterie')} ${q} ${u.nom} ${q>1?'recrutées':'recrutée'} (${(u.hommes*q).toLocaleString('fr-FR')} hommes).`);
+    const k=b.dataset.buy, q=+b.dataset.q, u=UNITES[k], prix=coutUnite(p,k);
+    p.or -= prix.or*q; p.mat -= prix.mat*q; p.armee[k] += q;
+    logue(`${ic('infanterie')} ${q} ${u.nom} ${q>1?'recrutées':'recrutée'} (${(u.hommes*q).toLocaleString('fr-FR')} hommes) — elles rejoignent la garnison de la capitale.`);
     majUI(); });
+  if(typeof brancherCorps === 'function') brancherCorps(el);
   el.querySelectorAll('[data-sell]').forEach(b=> b.onclick = ()=>{
     const k=b.dataset.sell; p.armee[k]--; p.or += UNITES[k].or*0.35; majUI(); });
 }
@@ -1466,6 +1479,7 @@ function majBadgeChat(){
 }
 
 function majUI(){
+  if(typeof revelerDecouvertes === 'function') revelerDecouvertes();   // une colonie fondée à l'instant livre son secret
   majBarre();
   ({province:panProvince, pays:panPays, tech:panTech, diplo:panDiplo, armee:panArmee, chat:panChat})[S.tab]();
   majBadgeChat();
@@ -1789,7 +1803,8 @@ function sauvegarder(auto){
         croyances:n.croyances ? {...n.croyances} : null, negociation:n.negociation || null,
         confirmation:n.confirmation || null, menaceEnCours:n.menaceEnCours || null,
         allianceJusqu:n.allianceJusqu || null, allianceDebut:n.allianceDebut || null,
-        chocCapitale:n.chocCapitale || null, ageOr:n.ageOr || 0, alertesVictoire:n.alertesVictoire || null,
+        corps: typeof corpsVersSauvegarde === 'function' ? corpsVersSauvegarde(n) : [], missions:[...(n.missions||[])],
+        chocCapitale:n.chocCapitale || null, paixProposee:n.paixProposee ?? null, ageOr:n.ageOr || 0, alertesVictoire:n.alertesVictoire || null,
         ancienneCapitale: n.ancienneCapitale ? key(n.ancienneCapitale.q, n.ancienneCapitale.r) : null,
         capitale: n.capitale ? key(n.capitale.q, n.capitale.r) : null,
       })),
@@ -1798,7 +1813,7 @@ function sauvegarder(auto){
       log: S.log.slice(-150),
       tiles: [...S.tiles.values()].map(t=>({
         q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:+t.pop.toFixed(2),
-        blds:batiments(t), fort:t.fort, occ: t.occ ? {par:t.occ.par, val:+t.occ.val.toFixed(3), mois:t.occ.mois} : null,
+        blds:batiments(t), fort:t.fort, dec:t.dec || null, gisement:!!t.gisement, occ: t.occ ? {par:t.occ.par, val:+t.occ.val.toFixed(3), mois:t.occ.mois} : null,
       })),
     };
     localStorage.setItem(CLE_SAUV, JSON.stringify(d));
@@ -1830,14 +1845,16 @@ function appliquerSauvegarde(d){
   for(const t of d.tiles)
     S.tiles.set(key(t.q,t.r), {q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:t.pop,
       bld:null, blds:Array.isArray(t.blds) ? t.blds.slice() : (t.bld ? [t.bld] : []),
-      fort:t.fort, occ:t.occ, geo:null});
+      fort:t.fort, occ:t.occ, geo:null, dec:t.dec || null, gisement:!!t.gisement});
   for(const t of S.tiles.values()) rangerBatiments(t);   // le dominant se recalcule
   for(const n of d.nations){
-    const nat = {...n, tech:new Set(n.tech), guerre:new Set(n.guerre),
+    const nat = {...n, armee:Object.assign(armeeVide(), n.armee), missions:new Set(n.missions||[]),
+      tech:new Set(n.tech), guerre:new Set(n.guerre),
       allies:new Set(n.allies), pacte:new Set(n.pacte), commerce:new Set(n.commerce||[]),
       capitale: n.capitale ? S.tiles.get(n.capitale) : null,
       ancienneCapitale: n.ancienneCapitale ? S.tiles.get(n.ancienneCapitale) : null};
     if(!nat.joueur) initDiplomatie(nat, nat.id);
+    if(typeof corpsDepuisSauvegarde === 'function') corpsDepuisSauvegarde(nat, n.corps);
     S.nations.push(nat);
     if(nat.joueur) S.player = nat;
   }
@@ -1943,14 +1960,33 @@ function texteAide(){
     <li><b>${ic('pacte')} Pacte de non-agression</b> — possible à partir d'une relation correcte ; l'IA ne t'attaquera pas.</li>
     <li><b>${ic('alliance')} Alliance</b> — à partir d'une relation de 55 ; ton allié entre en guerre avec toi.</li>
     <li><b>${ic('guerre')} Déclarer la guerre</b> — les alliés de la cible se joignent à elle et le monde entier t'en tient rigueur.</li>
-    <li><b>${ic('paix')} Paix</b> — l'adversaire refuse tant qu'il se croit plus fort que toi.</li>
+    <li><b>${ic('paix')} Paix</b> — elle se négocie en conversation, le temps arrêté ; un dirigeant qui perd te la propose lui-même.</li>
   </ul>
 
   <h2>${ic('infanterie')} Armée</h2>
-  <p>Tu achètes un <b>nombre précis d'unités</b>, chacune avec son coût, son entretien mensuel et ses effectifs réels.</p>
+  <p>Tu achètes un <b>nombre précis d'unités</b>, chacune avec son coût, son entretien mensuel et ses effectifs réels.
+  Les recrues rejoignent la garnison de ta capitale ; un <b>arsenal</b> baisse leur prix de 20 %.</p>
   <ul>${CLES_UNITES.map(k=>`<li>${u(k)}</li>`).join('')}</ul>
-  <p>L'aviation annule une partie des fortifications adverses, la marine donne un bonus sur les provinces
-  côtières, l'infanterie encaisse, l'artillerie frappe fort mais se défend mal.</p>
+
+  <h2>${ic('guerre')} Les corps d'armée</h2>
+  <p>Tes troupes forment des <b>corps d'armée</b> posés sur la carte — les bannières chiffrées. Une province n'est
+  défendue que par les corps qui s'y trouvent, par sa <b>milice</b> (ses habitants) et par ses murs ; les corps
+  voisins viennent en soutien pour un quart de leur force.</p>
+  <ul>
+    <li><b>Marcher</b> — onglet Armée : <i>Destination</i>, puis clique une province. Une case par mois ; une de plus
+      pour une troupe entièrement montée (cavalerie, chars), sur une <b>route</b>, ou avec la <b>Logistique</b>.</li>
+    <li><b>Passer</b> — chez toi, chez un allié, sur une terre libre. Une province ennemie, en guerre, est assaillie à l'arrivée.</li>
+    <li><b>Ravitaillement</b> — hors de tes terres, un corps s'use : 2 % par mois à une case de chez toi, 6 % plus loin.</li>
+    <li><b>Diviser</b> un corps pour garder deux frontières ; deux corps immobiles sur la même province fusionnent.</li>
+  </ul>
+
+  <h2>${ic('attaque')} Une bataille en trois phases</h2>
+  <ul>
+    <li><b>① Bombardement</b> — artillerie, aviation et, sur une côte, la flotte : pertes, et une <b>brèche</b> qui réduit les fortifications.</li>
+    <li><b>② Mêlée</b> — le gros des troupes contre la garnison, la milice et ce qui reste des murs. La <b>Tactique</b> y donne +15 %.</li>
+    <li><b>③ Poursuite</b> — cavalerie, chars et aviation du vainqueur achèvent la déroute.</li>
+  </ul>
+  <p>Le hasard ne pèse que de ±7 % : la composition des troupes et le terrain décident.</p>
 
   <h2>${ic('attaque')} L'invasion est progressive</h2>
   <p>Une province ne tombe pas d'un seul assaut. Chaque attaque fait <b>avancer le front</b> d'un pourcentage

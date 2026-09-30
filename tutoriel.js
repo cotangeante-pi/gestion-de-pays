@@ -128,13 +128,17 @@ const CHAPITRES = [
     { titre: 'Le rapport de puissance', cible: '#side',
       texte: `En bas de l'onglet, les barres comparent ta puissance à celle de chaque nation :
         <span style="color:#4ad991">vert</span> = tu es plus fort, <span style="color:#ff6b6b">rouge</span> = méfiance.
-        <br><br><b>Infanterie</b> : solide en défense · <b>Artillerie</b> : frappe fort · <b>Chars</b> : offensives ·
-        <b>Aviation</b> : ignore une partie des fortifications · <b>Marine</b> : transporte tes troupes et attaque les côtes.` },
+        <br><br><b>Milice</b> : garde à bas prix · <b>Infanterie</b> et <b>Fusiliers</b> : le gros des troupes ·
+        <b>Cavalerie</b> : rapide, poursuit · <b>Artillerie</b> : bombarde, ouvre une brèche · <b>Chars</b> : percent et poursuivent ·
+        <b>Aviation</b> : bombarde et contourne les murs · <b>Marine</b> : transporte tes troupes et bombarde les côtes.` },
     { titre: 'Comment on fait la guerre', cible: '#map',
-      texte: `Pour attaquer, tu dois être <b>en guerre</b> (onglet Diplomatie). Clique ensuite une province ennemie
-        <b>voisine</b> de la tienne : le panneau propose d'<b>engager 25, 50 ou 100 %</b> de tes forces.
-        <br><br>Une province ne tombe pas d'un coup : chaque victoire fait <b>avancer le front</b>, une jauge
-        se remplit, et à 100 % elle est à toi. Une <b>lunette de bataille</b> te montre chaque assaut.
+      texte: `Ton armée est faite de <b>corps d'armée</b> posés sur la carte (les bannières avec un chiffre).
+        Une province n'est défendue que par ceux qui s'y trouvent — et par sa milice.
+        <br><br>Pour attaquer, il faut être <b>en guerre</b> (onglet Diplomatie). Dans l'onglet Armée, clique
+        <b>Destination</b> puis une province ennemie : le corps marche (une case par mois) et donne l'assaut à l'arrivée.
+        Loin de tes terres, faute de ravitaillement, il s'use.
+        <br><br>Chaque bataille a trois phases : <b>bombardement</b>, <b>mêlée</b>, <b>poursuite</b>. Une province ne tombe
+        pas d'un coup : le front avance, et à 100 % elle est à toi. La <b>lunette de bataille</b> montre chaque assaut.
         <br><br>⚠️ Si tu perds ta <b>capitale</b>, ton peuple est sous le choc pendant des mois.` },
   ]
 },

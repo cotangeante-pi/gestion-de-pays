@@ -469,7 +469,9 @@ function replique(n, an, d){
     case 'accepte': case 'contre': case 'refuse':
       return parler(n, an, d);
 
-    case 'conclu':  return fin(`${majuscule(choix(MOTS.accepte[reg]))} : ${d.prix} or, et ${LIBELLES[d.action]} prend effet.`);
+    case 'conclu':  return fin(d.prix > 0
+      ? `${majuscule(choix(MOTS.accepte[reg]))} : ${d.prix} or, et ${LIBELLES[d.action]} prend effet.`
+      : `${majuscule(choix(MOTS.accepte[reg]))} : ${LIBELLES[d.action]} prend effet, sans contrepartie.`);
     case 'cede':    return fin(`${d.prix} or ? Tu marchandes bien. Dis « d'accord » et c'est signé.`);
     case 'concede': return fin(`${d.avant} or te semblent trop ? Va pour ${d.prix}. C'est mon dernier mot, ou presque.`);
     case 'ferme':   return fin(`J'ai déjà cédé deux fois. La discussion est close.`);

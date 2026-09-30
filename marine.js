@@ -78,12 +78,15 @@ function cibleNavale(n, t){
 }
 
 /* --- part de l'armée réellement embarquable --- */
-function fracEmbarquee(n, frac){
-  const total = nbUnites(n.armee), cap = capaciteNavale(n);
-  if(total < 1 || cap < 1) return 0;
-  return Math.min(frac, cap / total);
+// on embarque une part du corps posté sur une côte ; la flotte limite ce qu'elle porte (armees.js)
+function fracEmbarquee(n, frac){ return capaciteNavale(n) < 1 ? 0 : frac; }
+function corpsDebarquement(n, frac){
+  const c = typeof corpsEmbarquable === 'function' ? corpsEmbarquable(n) : null;
+  const d = apercuDetachement(c ? c.u : armeeVide(), fracEmbarquee(n, frac));
+  let place = capaciteNavale(n);
+  for(const k of CLES_UNITES){ if(k === 'navires') continue; const p = Math.min(d[k], place); d[k] = p; place -= p; }
+  return d;
 }
-const corpsDebarquement = (n, frac) => apercuDetachement(n.armee, fracEmbarquee(n, frac));
 
 /* ---------- colonisation outre-mer ---------- */
 const COUT_COLONIE_MER = 200;                 // franchir la mer coûte plus qu'un pas de plus

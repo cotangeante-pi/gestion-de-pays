@@ -295,6 +295,43 @@ function batiment(t, x, y, z, col){
       cx.beginPath(); cx.arc(x, y-14*s, 10*s, Math.PI, 0); cx.fill();
       drapeau(x, y-24*s, 12*s, '#7fd0ff');
       break;
+    case 'marche':
+      for(let i=-1;i<=1;i++){
+        boite(x+i*9*s, y+3*s, 8*s, 6*s, '#a07a4a');
+        cx.fillStyle = i%2 ? '#d9534f' : '#f0e2c0';
+        cx.beginPath(); cx.moveTo(x+i*9*s-5*s, y-3*s); cx.lineTo(x+i*9*s, y-8*s); cx.lineTo(x+i*9*s+5*s, y-3*s); cx.fill();
+      }
+      break;
+    case 'route':
+      cx.strokeStyle = 'rgba(190,175,140,.9)'; cx.lineWidth = 4*s;
+      cx.beginPath(); cx.moveTo(x-16*s, y+6*s); cx.quadraticCurveTo(x, y-2*s, x+16*s, y+4*s); cx.stroke();
+      cx.strokeStyle = 'rgba(255,255,255,.5)'; cx.lineWidth = 0.8*s; cx.setLineDash([3*s,3*s]);
+      cx.beginPath(); cx.moveTo(x-16*s, y+6*s); cx.quadraticCurveTo(x, y-2*s, x+16*s, y+4*s); cx.stroke(); cx.setLineDash([]);
+      boite(x+10*s, y+1*s, 3*s, 7*s, '#cfc8b4');
+      break;
+    case 'entrepot':
+      boite(x, y+4*s, 24*s, 11*s, '#8a6a42');
+      cone(x, y-7*s, 26*s, 7*s, '#6e5233');
+      cx.fillStyle = '#4a3622'; cx.fillRect(x-3*s, y-4*s, 6*s, 7*s);
+      break;
+    case 'hopital':
+      boite(x, y+4*s, 22*s, 14*s, '#eef0f4');
+      cx.fillStyle = '#d9534f';
+      cx.fillRect(x-1.5*s, y-16*s, 3*s, 9*s); cx.fillRect(x-4.5*s, y-13*s, 9*s, 3*s);
+      break;
+    case 'arsenal':
+      boite(x, y+4*s, 24*s, 12*s, '#5c5a60');
+      cx.fillStyle = '#2e2c32';
+      cx.beginPath(); cx.arc(x-6*s, y-9*s, 3*s, 0, 7); cx.arc(x, y-9*s, 3*s, 0, 7); cx.arc(x+6*s, y-9*s, 3*s, 0, 7); cx.fill();
+      drapeau(x+11*s, y-10*s, 11*s, col);
+      break;
+    case 'theatre':
+      boite(x, y+4*s, 22*s, 9*s, '#e3d6b8');
+      cx.fillStyle = '#b5553f';
+      cx.beginPath(); cx.arc(x, y-5*s, 11*s, Math.PI, 0); cx.fill();
+      cx.fillStyle = '#f3ead2';
+      for(let i=-2;i<=2;i++) cx.fillRect(x+i*4*s-0.8*s, y-5*s, 1.6*s, 8*s);
+      break;
     case 'caserne':
       boite(x, y+4*s, 26*s, 13*s, '#8b8577');
       cx.fillStyle = sh('#8b8577',1.15);
@@ -472,6 +509,8 @@ function dessiner(ts){
 
   for(const [t,p] of visibles) calqueTuile(t, p, z);
   for(const [t,p] of visibles) propsTuile(t, p, z);
+  if(typeof dessinerDecouvertes === 'function') for(const [t,p] of visibles) if(t.dec) dessinerDecouvertes(t, p, z);
+  if(typeof dessinerCorps === 'function') dessinerCorps(z);            // les armées, et leurs routes
 
   dessinerNuages(dt);
   dessinerFX();
@@ -552,7 +591,6 @@ function propsTuile(t, p, z){
   if(n && n.capitale === t){
     boite(p.x + 15*z, p.y - 3*z, 9*z, 22*z, '#b9bcc6');
     drapeau(p.x + 15*z, p.y - 25*z, 16*z, n.col, t.q);
-    garnison(n, p.x, p.y, z);
   }
   if(t.occ){                                     // jauge d'avancée du front
     const w = 30*z, y = p.y - 30*z;
@@ -774,6 +812,7 @@ function infobulle(e){
 function clicCarte(e){
   const r = cv.getBoundingClientRect();
   const t = tuileSous(e.clientX-r.left, e.clientY-r.top);
+  if(t && typeof clicOrdreMarche === 'function' && clicOrdreMarche(t)) return;   // un ordre de marche en attente
   if(t){ S.sel = t; ongletActif('province'); majUI(); if(typeof SON !== 'undefined') SON.jouer('selection'); }
 }
 

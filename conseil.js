@@ -235,10 +235,10 @@ function actionsPossibles(p = S.player){
   if(menaceMax){
     for(const k of CLES_UNITES){
       if(!uniteDispo(p, k)) continue;
-      const U = UNITES[k];
+      const U = UNITES[k], prix = coutUnite(p, k);
       const val = (U.att + U.def)/2 * v.defense * 0.09 - U.up*v.or;
-      out.push({type:'recruter', cle:k, valeur:val * (menaceMax.gravite), abordable: p.or >= U.or && p.mat >= U.mat,
-        cout:{or:U.or, mat:U.mat}, libelle:`recruter 1 ${U.nom.toLowerCase()}`,
+      out.push({type:'recruter', cle:k, valeur:val * (menaceMax.gravite), abordable: p.or >= prix.or && p.mat >= prix.mat,
+        cout:{or:prix.or, mat:prix.mat}, libelle:`recruter 1 ${U.nom.toLowerCase()}`,
         pourquoi:`${menaceMax.nation.nom} pèse ${menaceMax.ratio.toFixed(2)} fois ta puissance`});
     }
   }
@@ -246,8 +246,10 @@ function actionsPossibles(p = S.player){
   // --- colonisation ---
   const libres = tuilesDe(p).flatMap(voisins).filter(t => t && t.owner === null && t.terr !== 'ocean');
   if(libres.length && p.or >= 120){
-    const best = libres.sort((a,b2)=> (TERRAIN[b2.terr].food+TERRAIN[b2.terr].mat) - (TERRAIN[a.terr].food+TERRAIN[a.terr].mat))[0];
-    out.push({type:'coloniser', cible:best, valeur: 2.4 + TERRAIN[best.terr].food*0.4, abordable:true,
+    // une terre qui cache une découverte passe devant les autres
+    const attrait = t => TERRAIN[t.terr].food + TERRAIN[t.terr].mat + (t.dec ? 4 : 0);
+    const best = libres.sort((a,b2)=> attrait(b2) - attrait(a))[0];
+    out.push({type:'coloniser', cible:best, valeur: 2.4 + TERRAIN[best.terr].food*0.4 + (best.dec ? 1.5 : 0), abordable:true,
       cout:{or:120}, libelle:`coloniser la terre ${nomTuile(best)}`,
       pourquoi:`${TERRAIN[best.terr].nom.toLowerCase()} inoccupé${TERRAIN[best.terr].nom.endsWith('e')?'e':''}`});
   }
@@ -296,8 +298,8 @@ function planDeGuerre(ennemi){
     const parTerre = voisins(t).some(v => v.owner === p.id);
     const traversee = parTerre ? 0 : mer.get(t);
     if(!parTerre && traversee === undefined) continue;
-    const fortif = TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
-    const def = (forceDef(ennemi.armee, ennemi) + 25) * (1 + fortif/100);
+    const fortif = fortifTuile(t);
+    const def = defenseEstimee(t);                         // sa garnison, sa milice et ses murs, pas toute son armée
     // une côte lointaine coûte plus cher qu'une frontière : on la classe après
     fronts.push({tuile:t, fortif, def, naval:!parTerre, traversee:traversee || 0,
                  rang: def * (parTerre ? 1 : 1.45)});
@@ -308,9 +310,11 @@ function planDeGuerre(ennemi){
     raison: mer.size ? 'aucune de ses provinces n\'est à portée' : 'ni frontière ni portée navale'};
 
   // un débarquement n'engage que ce que la flotte peut porter, et frappe à 70%
+  // seul le corps au contact (ou embarqué) peut frapper : le reste de l'armée est ailleurs
+  const contact = cible.naval ? null : corpsAuContact(p, cible.tuile);
   const att = cible.naval
     ? forceAtt(corpsDebarquement(p, 1), p) * 0.70
-    : forceAtt(p.armee, p);
+    : (contact ? forceAtt(contact.u, p) * tactique(p) : 0);
   const ratio = att / cible.def;
   const proba = clamp((ratio - 0.70) / 0.75, 0, 1);         // bornes réelles du tirage de bataille
   const manque = Math.max(0, cible.def*1.25 - att);
@@ -343,12 +347,12 @@ function executer(a, p = S.player){
       return {ok:true, txt:`${B.nom} bâtie sur ${nomTuile(t)} (−${B.or} or, −${B.mat} matériaux)`};
     }
     case 'recruter': {
-      const U = UNITES[a.cle], q = a.quantite || 1;
+      const U = UNITES[a.cle], q = a.quantite || 1, prix = coutUnite(p, a.cle);
       if(!uniteDispo(p, a.cle)) return {ok:false, txt:`il faut la technologie « ${TECHS[U.tech].nom} »`};
-      if(p.or < U.or*q || p.mat < U.mat*q)
-        return {ok:false, txt:`il manque ${Math.max(0,Math.ceil(U.or*q-p.or))} or et ${Math.max(0,Math.ceil(U.mat*q-p.mat))} matériaux`};
-      p.or -= U.or*q; p.mat -= U.mat*q; p.armee[a.cle] += q;
-      return {ok:true, txt:`${q} ${U.nom.toLowerCase()} recrutée(s) (−${U.or*q} or, ${(U.hommes*q).toLocaleString('fr-FR')} hommes)`};
+      if(p.or < prix.or*q || p.mat < prix.mat*q)
+        return {ok:false, txt:`il manque ${Math.max(0,Math.ceil(prix.or*q-p.or))} or et ${Math.max(0,Math.ceil(prix.mat*q-p.mat))} matériaux`};
+      p.or -= prix.or*q; p.mat -= prix.mat*q; p.armee[a.cle] += q;
+      return {ok:true, txt:`${q} ${U.nom.toLowerCase()} recrutée(s) (−${prix.or*q} or, ${(U.hommes*q).toLocaleString('fr-FR')} hommes) — à la garnison de la capitale`};
     }
     case 'impot': {
       const avant = p.taxe; p.taxe = clamp(a.taux, 0, 0.8);
