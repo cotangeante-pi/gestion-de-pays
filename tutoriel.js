@@ -237,8 +237,11 @@ const CHAPITRES = [
         <li><kbd>M</kbd> : mini-carte</li><li><kbd>H</kbd> : règles du jeu</li></ul>` },
     { titre: 'Comment gagner',
       texte: ()=> `${S.finMois
-          ? `Tu joues une <b>partie courte</b> : dans <b>${Math.max(0, S.finMois - S.mois)} mois</b>, le pays qui a le plus de provinces gagne.`
-          : `Tu joues une <b>partie longue</b> : tu gagnes quand tu es la dernière nation debout.`}
+          ? `Ta partie dure <b>${Math.round(S.finMois/12)} ans</b> : s'il n'y a pas eu de victoire avant, le meilleur <b>score de civilisation</b> gagne (territoire, économie, savoir, puissance, prospérité, diplomatie).`
+          : `Tu joues une <b>partie longue</b> : pas d'horloge, seulement des victoires.`}
+        <br><br>🏆 <b>Cinq victoires anticipées</b>, pour toi comme pour l'IA : <b>domination</b> (la moitié des terres),
+        <b>savoir</b> (toutes les technologies), <b>richesse</b> (15 000 or), <b>diplomatie</b> (alliés de la moitié du monde, sans guerre)
+        et <b>âge d'or</b> (24 mois de prospérité). Ta progression est dans l'onglet <b>Pays</b>.
         <br><br>💡 <b>Mes conseils :</b>
         <ul><li>Colonise vite les terres libres au début.</li>
         <li>Garde toujours de la nourriture et un bonheur au-dessus de 50.</li>
@@ -312,17 +315,18 @@ function tutoMenu(){
   document.getElementById('tutoMenu').classList.remove('hidden');
 }
 
-/* --- proposition au lancement d'une toute première partie --- */
-function tutoProposer(){
+/* --- proposition au lancement : juste après l'introduction ---
+   À la toute première partie, on propose tout le tutoriel ; ensuite, le même
+   menu revient pour réviser un chapitre, et se ferme d'un clic. */
+function tutoProposer(apresIntro){
   let fait = false;
   try{ fait = !!localStorage.getItem(TUTO.CLE); }catch(e){}
-  if(fait) return;
+  if(fait && !apresIntro) return;
   tutoElements();
-  document.getElementById('tutoMenuNote').innerHTML =
-    '<b>C\'est ta première partie ?</b> Je te montre tout, pas à pas. Le temps reste arrêté pendant le tutoriel.';
   tutoMenu();
-  document.getElementById('tutoMenuNote').innerHTML =
-    '<b>C\'est ta première partie ?</b> Je te montre tout, pas à pas. Le temps reste arrêté pendant le tutoriel.';
+  document.getElementById('tutoMenuNote').innerHTML = fait
+    ? '<b>Ton pays est né.</b> Envie de revoir les bases ? Choisis un chapitre, ou ferme avec ✕ pour jouer.'
+    : '<b>C\'est ta première partie ?</b> Je te montre tout, pas à pas. Le temps reste arrêté pendant le tutoriel.';
   if(typeof SON !== 'undefined') SON.jouer('tuto');
 }
 

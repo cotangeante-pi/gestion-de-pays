@@ -19,7 +19,9 @@ meneur rallie les siens sur un quai au crépuscule, ils embarquent, traversent l
 mer de nuit, débarquent à l'aube et plantent le drapeau du pays… avant de
 découvrir, à l'horizon, les feux et les couleurs des nations rivales. Puis la
 scène s'efface et la caméra recule de ta capitale jusqu'à la carte entière :
-la partie commence. Environ 45 secondes ; un clic passe au sous-titre suivant,
+la partie commence. Le tout sur une musique d'aventure — cordes, cuivres, harpe,
+timbales — composée note à note dans le navigateur, sans aucun fichier.
+Environ 45 secondes, et le tutoriel s'ouvre dès la fin du dézoom ; un clic passe au sous-titre suivant,
 `Échap`, `Entrée`, `Espace` ou le bouton *Passer* vont droit au jeu. Une
 sauvegarde reprise ne la rejoue pas.
 
@@ -115,12 +117,39 @@ que font les autres nations.
 Un Conseil de la Couronne partage le même moteur et gère ton pays avec toi :
 il diagnostique, projette, classe les actions par rendement et exécute tes ordres.
 
-## Deux façons de jouer
+## Trois façons de jouer
 
-La **partie courte** tient en cinq ans : elle s'arrête d'elle-même et classe les
-nations par provinces. Environ deux minutes en vitesse normale, plus le temps
-que tu prends à décider — cinq minutes en pratique. La **partie longue** est sans horloge, jusqu'à la victoire
-totale.
+La **partie courte** dure quinze ans (environ cinq minutes en vitesse normale).
+La **personnalisée** dure ce que tu choisis, de 5 à 100 ans. La **partie longue**
+n'a pas d'horloge.
+
+## Gagner
+
+Cinq **victoires anticipées**, ouvertes à toi comme à l'IA, arrêtent la partie :
+**domination** (la moitié des terres), **savoir** (toutes les technologies),
+**richesse** (15 000 or), **diplomatie** (l'allié de la moitié des nations encore
+debout, sans aucune guerre) et **âge d'or** (24 mois d'affilée avec 150k habitants
+et un bonheur d'au moins 78). L'onglet Pays montre ta progression et celle du
+rival le plus avancé ; le journal prévient quand quelqu'un atteint 75 %.
+
+Quand l'horloge d'une partie limitée s'arrête sans vainqueur, le **score de
+civilisation** départage : six domaines — territoire, économie, savoir,
+puissance, prospérité, diplomatie — notés sur 100, la meilleure nation de chaque
+domaine faisant 100. On gagne en excellant partout, ou en dominant quelques
+domaines.
+
+## Une IA qui joue à la loyale
+
+Les adversaires suivent les mêmes règles que toi : ils paient leurs colonies et
+leurs ouvrages, produisent et dépensent leur recherche, subissent les mêmes
+épidémies et tempêtes. Ils choisissent leurs actions avec le moteur du Conseil de
+la Couronne — chaque option chiffrée selon l'état de leur pays — puis y ajoutent
+leur caractère : un conquérant arme davantage, un prudent bâtit. Ils nouent entre
+eux commerce, pactes et alliances, poussent un front déjà entamé plutôt que
+d'attaquer au hasard, et demandent la paix quand ils perdent.
+
+Chaque nation part sans technologie ; une recherche de base, portée par la
+population, permet de découvrir l'Écriture puis de bâtir des universités.
 
 ## Négocier au clic
 
@@ -175,7 +204,8 @@ l'interface, ni en donnant l'ordre au Conseil.
 
 | | |
 |---|---|
-| `game.js` | état du monde, économie, guerre, interface |
+| `game.js` | état du monde, économie, guerre, IA, interface |
+| `victoire.js` | victoires anticipées, score de civilisation, fin de partie |
 | `render.js`, `relief.js` | rendu de la carte et du relief |
 | `ia.js` | compréhension, raisonnement, génération de parole |
 | `ia-gestion.js` | lexique et intentions du Conseil |
@@ -191,5 +221,6 @@ l'interface, ni en donnant l'ordre au Conseil.
 | `conseil.js` | Conseil de la Couronne |
 | `son.js` | sons composés à la volée et petite voix |
 | `intro.js` | scène d'introduction et dézoom vers la carte |
+| `intro-musique.js` | musique d'aventure de l'introduction, synthétisée |
 | `tutoriel.js` | tutoriel pas à pas, en chapitres |
 | `tests/banc-ia.html` | banc de test de la compréhension : ouvre-le dans un navigateur |

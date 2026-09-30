@@ -90,15 +90,23 @@
     <div class="accmodes">
       <button class="accmode actif" data-mode="courte">
         <b>Partie courte</b>
-        <span>Cinq ans. Le plus grand royaume l'emporte.</span>
+        <span>Quinze ans. Le meilleur score de civilisation l'emporte.</span>
         <i>≈ 5 minutes</i>
+      </button>
+      <button class="accmode" data-mode="perso">
+        <b>Personnalisée</b>
+        <span>De 5 à 100 ans : tu fixes la durée.</span>
+        <i>à ta mesure</i>
       </button>
       <button class="accmode" data-mode="longue">
         <b>Partie longue</b>
-        <span>Sans limite. Règne jusqu'à la victoire totale.</span>
+        <span>Sans limite. Règne jusqu'à la victoire.</span>
         <i>aussi longtemps que tu veux</i>
       </button>
     </div>
+
+    <label class="accchamp hidden" id="champDuree"><span>Durée de la partie</span><b id="vDuree">30 ans</b>
+      <input class="slider" type="range" id="sDuree" min="5" max="100" value="30"></label>
 
     <label class="accchamp"><span>Adversaires</span><b id="vAdv">6</b>
       <input class="slider" type="range" id="sAdv" min="1" max="29" value="6"></label>
@@ -140,6 +148,8 @@
 <script src="relief.js"></script>
 <script src="render.js"></script>
 <script src="game.js"></script>
+<script src="victoire.js"></script>
+<script src="intro-musique.js"></script>
 <script src="intro.js"></script>
 <script src="tutoriel.js"></script>
 </body>

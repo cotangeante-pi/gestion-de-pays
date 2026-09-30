@@ -241,19 +241,31 @@ const MAX_ADVERSAIRES = Math.min(NOMS_IA.length, COULEURS.length) - 1;   // auta
 const MAX_ILES = 18;
 
 /* ===========================================================
-   DEUX FAÇONS DE JOUER
-   La partie courte a une fin annoncée : cinq ans, et le plus
-   grand royaume l'emporte. La partie longue est celle d'avant,
-   sans horloge, jusqu'à la victoire totale.
+   TROIS FAÇONS DE JOUER
+   La partie courte dure quinze ans ; la personnalisée, de 5 à
+   100 ans au choix. À la fin de l'horloge, le score de
+   civilisation départage les nations (victoire.js). La partie
+   longue n'a pas d'horloge. Dans les trois, une victoire
+   anticipée — domination, savoir, richesse, diplomatie, âge
+   d'or — peut tout arrêter avant l'heure.
    =========================================================== */
 const MODES = {
-  courte: {nom:'Partie courte', duree:60, ms:1800, adversaires:5, iles:3, taille:1,
-           objectif:'Cinq ans pour bâtir le plus grand royaume.'},
-  longue: {nom:'Partie longue', duree:0,  ms:2500, adversaires:6, iles:6, taille:2,
-           objectif:'Sans limite : règne jusqu\'à la victoire totale.'},
+  courte: {nom:'Partie courte', annees:15, ms:1500, adversaires:5, iles:4, taille:1,
+           objectif:'Quinze ans pour mener ta civilisation au premier rang.'},
+  perso:  {nom:'Partie personnalisée', annees:30, ms:1500, adversaires:6, iles:5, taille:2, reglable:true,
+           objectif:'La durée que tu choisis, de 5 à 100 ans.'},
+  longue: {nom:'Partie longue', annees:0,  ms:2500, adversaires:6, iles:6, taille:2,
+           objectif:'Sans limite : règne jusqu\'à la victoire.'},
 };
+const ANNEES_MIN = 5, ANNEES_MAX = 100;
+// durée d'une partie en mois : fixe, choisie à l'écran de départ, ou infinie (0)
+function dureeMois(cfg = CONFIG){
+  const m = MODES[cfg.mode] || MODES.longue;
+  if(m.reglable) return clamp(Math.round(cfg.annees || m.annees), ANNEES_MIN, ANNEES_MAX) * 12;
+  return m.annees * 12;
+}
 
-const CONFIG = {mode:'courte', adversaires:5, iles:3, taille:1};
+const CONFIG = {mode:'courte', adversaires:5, iles:4, taille:1, annees:30};
 
 // surface de terre visée, et rayon de carte qui va avec
 function planMonde(cfg = CONFIG){
@@ -390,14 +402,14 @@ function genererMonde(cfg = CONFIG){
       id:i, nom: noms[i] || ('Nation '+i), col: i===0?'#4da3ff':(COULEURS[i-1]||'#888'),
       joueur:i===0, or:400, mat:150, nourriture:120, bonheur:65,
       armee: Object.assign(armeeVide(), {infanterie: i===0?2:ri(1,3)}),
-      taxe:0.35, sci:0, tech:new Set(['ecriture']), rech:null,
+      taxe:0.35, sci:0, tech:new Set(), rech:null,
       rel:{}, guerre:new Set(), allies:new Set(), pacte:new Set(),
       agressivite:rnd(0.15,0.8), capitale:best,
     };
     n.commerce = new Set();
     if(i>0) initDiplomatie(n, i);
     S.nations.push(n);
-    if(i===0){ S.player=n; n.tech=new Set(); }
+    if(i===0) S.player=n;
 
     // territoire de départ : la capitale, et rien d'autre.
     // Tout le reste se colonise ou se conquiert.
@@ -456,6 +468,9 @@ function bilan(n){
   }
   gold += pop * n.taxe * 0.55 * (aTech(n,'fiscalite')?1.25:1);
   if(n.commerce && n.commerce.size) gold *= 1 + 0.08*n.commerce.size;   // accords commerciaux
+  // des lettrés vivent dans toute population : sans eux, l'Écriture — et donc
+  // l'Université — restait hors d'atteinte pour qui partait sans technologie
+  sci += 1.5 + pop*0.05;
   sci  *= aTech(n,'informatique')?1.6:1;
   const conso = pop*0.35;
   const penurieEnergie = energie<0;
@@ -539,19 +554,13 @@ function tickMois(){
       t.pop = clamp(t.pop + t.pop*croiss + (t.pop<capMax?0.05:-0.05), 0.5, capMax);
     }
 
-    // recherche
-    if(n.joueur){
-      n.sci += b.sci;
-      if(n.rech && n.sci >= TECHS[n.rech].cout){
-        n.sci -= TECHS[n.rech].cout;
-        n.tech.add(n.rech);
-        logue(`${ic('universite')} Recherche terminée : <b>${TECHS[n.rech].nom}</b>`,'good');
-        n.rech = null;
-      }
-    } else if(Math.random()<0.02){
-      const dispo = Object.keys(TECHS).filter(k=>!n.tech.has(k)
-                    && TECHS[k].req.every(r=>n.tech.has(r)));
-      if(dispo.length) n.tech.add(pick(dispo));
+    // recherche : les mêmes règles pour tous, IA comprises
+    n.sci += b.sci;
+    if(n.rech && n.sci >= TECHS[n.rech].cout){
+      n.sci -= TECHS[n.rech].cout;
+      n.tech.add(n.rech);
+      if(n.joueur) logue(`${ic('universite')} Recherche terminée : <b>${TECHS[n.rech].nom}</b>`,'good');
+      n.rech = null;
     }
 
     // trésorerie négative : on dissout de l'armée
@@ -572,67 +581,126 @@ function tickMois(){
   majUI();
   if(S.mois % 12 === 0) sauvegarder(true);
   if(S.mois%12===0) verifierFin();
-  if(S.finMois && S.mois >= S.finMois) finDuTemps();
+  if(typeof suivreVictoires === 'function') suivreVictoires();
+  if(S.finMois && S.mois >= S.finMois && !S.victoire) finDuTemps();
 }
 
 // ---------- IA ----------
 
+/* Une IA joue avec les règles du joueur : mêmes coûts, même recherche, même
+   carte. Elle s'appuie sur le moteur du Conseil de la Couronne — qui chiffre
+   chaque action possible — et y ajoute son caractère : prudente ou conquérante. */
 function iaJoue(n, b){
-  // construire
-  if(n.or>200 && n.mat>60 && Math.random()<0.25){
-    const ts = tuilesDe(n).filter(t=>placeLibre(t));
-    if(ts.length){
-      const t = pick(ts);
-      const opts = Object.entries(BUILDINGS).filter(([k,v])=>
-        (!v.tech||n.tech.has(v.tech)) && (!v.cote||t.terr==='cote'));
-      if(opts.length){ const [k,v]=pick(opts);
-        if(n.or>=v.or&&n.mat>=v.mat){ n.or-=v.or; n.mat-=v.mat; ajouterBatiment(t,k); } }
+  const reserve = 50 + b.upkeep*3;               // de quoi payer la solde quelques mois
+
+  // 1. recherche : la technologie la plus utile à son état du moment
+  if(!n.rech){
+    const r = actionsPossibles(n).find(a => a.type === 'recherche');
+    if(r) n.rech = r.cle;
+  }
+
+  // 2. armée : à la mesure de sa taille, de son tempérament et des dangers
+  const menace = menacePrincipale(n);
+  const voulue = Math.ceil(2 + tuilesDe(n).length*(0.35 + n.agressivite*0.8)
+               + (n.guerre.size ? 4 : 0) + (menace ? menace.gravite*2 : 0)
+               + (n.or > 900 ? 3 : 0));                 // un trésor qui dort finance l'armée
+  for(let k = 0; k < 2 && nbUnites(n.armee) < voulue; k++){
+    const u = iaMeilleureUnite(n, reserve, bilan(n));
+    if(!u) break;
+    n.or -= UNITES[u].or; n.mat -= UNITES[u].mat; n.armee[u]++;
+  }
+
+  // 3. économie : les trois actions les plus rentables, sans vider les caisses
+  let faites = 0;
+  for(const a of actionsPossibles(n)){
+    if(faites >= 3) break;
+    if(a.type === 'recherche' || a.type === 'recruter' || !a.abordable || a.valeur <= 0.3) continue;
+    const prix = (a.cout && a.cout.or) || 0;
+    if(prix > 0 && prix > n.or - reserve) continue;     // les mesures gratuites (impôts) restent permises
+    if(a.type === 'impot'){
+      if(S.mois - (n.dernierImpot ?? -99) < 12) continue;   // pas de va-et-vient fiscal
+      n.dernierImpot = S.mois;
     }
+    const r = executer(a, n);
+    if(r.ok) faites++;
   }
-  // recruter
-  if(n.or>250 && Math.random()<0.35){
-    const dispo = CLES_UNITES.filter(k=>uniteDispo(n,k) && n.or>=UNITES[k].or && n.mat>=UNITES[k].mat);
-    if(dispo.length){
-      // les IA agressives privilégient les unités lourdes
-      const k = Math.random()<n.agressivite ? dispo[dispo.length-1] : pick(dispo);
-      n.or -= UNITES[k].or; n.mat -= UNITES[k].mat; n.armee[k]++;
-    }
-  }
-  // coloniser
-  if(Math.random()<0.12){
-    const libres = tuilesDe(n).flatMap(voisins)
-      .filter(v=>v.owner===null && v.terr!=='ocean');
-    if(libres.length && n.or>120){ const c=pick(libres); c.owner=n.id; c.pop=2; n.or-=120;
-      if(typeof oublierMer === 'function') oublierMer(); }
-  }
-  // relations qui dérivent
+
+  // 4. relations qui dérivent — les frontières frottent, surtout chez les ambitieux —
+  //    et diplomatie entre IA
   for(const o of S.nations){
     if(o===n) continue;
-    if(n.guerre.has(o.id)) n.rel[o.id] = clamp(n.rel[o.id]-1,-100,100);
-    else n.rel[o.id] = clamp(n.rel[o.id] + (Math.random()<0.5?1:-0.5), -100, 100);
+    if(n.guerre.has(o.id)){ n.rel[o.id] = clamp(n.rel[o.id]-1,-100,100); continue; }
+    const friction = frontiereCommune(n, o) ? 0.35*n.agressivite : 0;
+    const liens = (n.commerce.has(o.id) ? 0.2 : 0) + (n.allies.has(o.id) ? 0.3 : 0);
+    n.rel[o.id] = clamp(n.rel[o.id] + (Math.random()<0.5 ? 0.9 : -0.9) - friction + liens, -100, 100);
   }
-  // déclarer la guerre
+  iaDiplomatie(n);
+
+  // 5. guerre : on ne s'en prend qu'à un voisin qu'on peut atteindre, et plus faible
   const appat = (typeof primeActive === 'function' && primeActive()) ? 3.5 : 1;
-  if(Math.random()<0.012*n.agressivite*3*appat){
+  if(!n.guerre.size && Math.random() < 0.02*n.agressivite*3*appat){
     const cibles = S.nations.filter(o=>o!==n && o.id!==undefined
-      && !n.guerre.has(o.id) && !n.allies.has(o.id) && !n.pacte.has(o.id)
-      && tuilesDe(o).length>0
-      && (n.rel[o.id]<10 || (o.joueur && appat>1))          // la prime fait oublier les bonnes manières
-      && puissance(n)>puissance(o)*(o.joueur && appat>1 ? 0.85 : 1.2));
-    if(cibles.length){ declarerGuerre(n, pick(cibles)); }
+      && !n.allies.has(o.id) && !n.pacte.has(o.id) && tuilesDe(o).length>0
+      && (frontiereCommune(n, o) || (!obstacleNaval(n) && capaciteNavale(n) >= 2))
+      && (n.rel[o.id] < 5 + n.agressivite*25 || (o.joueur && appat>1))   // la prime fait oublier les bonnes manières
+      && puissance(n)>puissance(o)*(o.joueur && appat>1 ? 0.85 : 1.3))
+      .sort((a, c) => puissance(a) - puissance(c));
+    if(cibles.length) declarerGuerre(n, cibles[0]);
   }
-  // attaquer
-  if(n.guerre.size && nbUnites(n.armee)>5 && Math.random()<0.3){
+  // attaquer : on pousse le front déjà entamé, sinon la province la moins défendue
+  if(n.guerre.size && nbUnites(n.armee) > 3 && Math.random() < 0.45){
     const front = tuilesDe(n).flatMap(voisins)
-      .filter(v=>v.owner!==null && v.owner!==n.id && n.guerre.has(v.owner));
-    if(front.length){ const c = pick(front); bataille(n, S.nations[c.owner], c, rnd(0.4,0.9)); }
+      .filter(v=>v && v.owner!==null && v.owner!==n.id && n.guerre.has(v.owner));
+    if(front.length){
+      const cout = t => (t.occ && t.occ.par === n.id ? -100*t.occ.val : 0)
+                      + TERRAIN[t.terr].def + (aBatiment(t,'caserne')?20:0) + t.fort;
+      const c = front.sort((a, d) => cout(a) - cout(d))[0];
+      bataille(n, S.nations[c.owner], c, 0.6);
+    }
   }
   // expéditions maritimes
   if(typeof iaMarine === 'function') iaMarine(n);
-  // faire la paix
-  if(n.guerre.size && Math.random()<0.05){
-    const o = S.nations[[...n.guerre][0]];
-    if(o && (puissance(o)>puissance(n) || Math.random()<0.5)) faireLaPaix(n,o);
+  // faire la paix : quand on perd, quand le peuple n'en peut plus
+  for(const id of [...n.guerre]){
+    const o = S.nations[id];
+    if(!o || o.joueur) continue;                  // avec le joueur, la paix se négocie par la parole
+    const perd = puissance(o) > puissance(n)*1.25, las = n.bonheur < 35;
+    if((perd && Math.random() < 0.2) || (las && Math.random() < 0.15) || Math.random() < 0.02)
+      faireLaPaix(n, o);
+  }
+  if(n.guerre.has(S.player.id) && Math.random() < 0.04
+     && (puissance(S.player) > puissance(n)*1.25 || n.bonheur < 30)) faireLaPaix(n, S.player);
+}
+
+// la meilleure unité qu'on puisse payer et entretenir
+function iaMeilleureUnite(n, reserve, b){
+  let best = null, score = -1;
+  for(const k of CLES_UNITES){
+    const U = UNITES[k];
+    if(!uniteDispo(n, k) || n.or - U.or < reserve || n.mat < U.mat) continue;
+    if(b.net - U.up < 1) continue;                // pas d'armée qu'on ne pourrait pas solder
+    const s = (U.att*(0.4 + n.agressivite) + U.def*(1.2 - n.agressivite*0.6)) / (U.or + U.mat*0.6);
+    if(s > score){ score = s; best = k; }
+  }
+  return best;
+}
+
+// entre IA : accords commerciaux, pactes, alliances — comme avec le joueur
+function iaDiplomatie(n){
+  for(const o of S.nations){
+    if(o === n || o.joueur || !tuilesDe(o).length || n.guerre.has(o.id)) continue;
+    const r = Math.min(n.rel[o.id], o.rel[n.id]);
+    if(r > 25 && !n.commerce.has(o.id) && Math.random() < 0.05){
+      n.commerce.add(o.id); o.commerce.add(n.id);
+    }
+    if(r > 40 && !n.pacte.has(o.id) && Math.random() < 0.04){
+      n.pacte.add(o.id); o.pacte.add(n.id);
+    }
+    const ennemiCommun = [...n.guerre].some(id => o.guerre.has(id));
+    if(r > 60 && n.pacte.has(o.id) && !n.allies.has(o.id) && (ennemiCommun || Math.random() < 0.02)){
+      n.allies.add(o.id); o.allies.add(n.id);
+      logue(`${ic('alliance')} Au loin : <b>${n.nom}</b> et <b>${o.nom}</b> s'allient.`);
+    }
   }
 }
 
@@ -757,21 +825,24 @@ function majOccupations(){
 // ---------- Événements ----------
 
 function evenementAleatoire(){
-  if(Math.random()>0.04) return;
-  const p = S.player, ts = tuilesDe(p);
-  if(!ts.length) return;
-  const e = pick([
-    ()=>{ const t=pick(ts); t.pop*=0.8;
-          logue(`${ic('pop')} Une épidémie frappe une province.`,'bad'); },
-    ()=>{ p.or+=180; logue(`${ic('or')} Découverte d'un gisement : +180 or.`,'good'); },
-    ()=>{ p.nourriture-=45; logue(`${ic('food')} Tempêtes : récoltes perdues.`,'bad'); },
-    ()=>{ p.sci+=50;  logue(`${ic('sci')} Un savant fait une percée : +50 recherche.`,'good'); },
-    ()=>{ p.bonheur=clamp(p.bonheur+10,0,100); logue(`${ic('bonheur')} Fête nationale : +10 bonheur.`,'good'); },
-    ()=>{ const libres=ts.flatMap(voisins).filter(v=>v.owner===null&&v.terr!=='ocean');
-          if(libres.length){ const c=pick(libres); c.owner=p.id; c.pop=2;
-            logue(`${ic('coloniser')} Des colons fondent une nouvelle province.`,'good'); } },
-  ]);
-  e();
+  // chaque nation court les mêmes risques et les mêmes chances que toi
+  for(const n of S.nations){
+    const ts = tuilesDe(n);
+    if(!ts.length || Math.random() > 0.04) continue;
+    const moi = n.joueur, dire = (txt, cls) => { if(moi) logue(txt, cls); };
+    pick([
+      ()=>{ const t=pick(ts); t.pop*=0.8;
+            dire(`${ic('pop')} Une épidémie frappe une province.`,'bad'); },
+      ()=>{ n.or+=180; dire(`${ic('or')} Découverte d'un gisement : +180 or.`,'good'); },
+      ()=>{ n.nourriture-=45; dire(`${ic('food')} Tempêtes : récoltes perdues.`,'bad'); },
+      ()=>{ n.sci+=50;  dire(`${ic('sci')} Un savant fait une percée : +50 recherche.`,'good'); },
+      ()=>{ n.bonheur=clamp(n.bonheur+10,0,100); dire(`${ic('bonheur')} Fête nationale : +10 bonheur.`,'good'); },
+      ()=>{ const libres=ts.flatMap(voisins).filter(v=>v.owner===null&&v.terr!=='ocean');
+            if(libres.length){ const c=pick(libres); c.owner=n.id; c.pop=2;
+              if(typeof oublierMer === 'function') oublierMer();
+              dire(`${ic('coloniser')} Des colons fondent une nouvelle province.`,'good'); } },
+    ])();
+  }
 }
 
 function verifierFin(){
@@ -787,35 +858,7 @@ function verifierFin(){
   }
 }
 
-// le compte des provinces départage la partie courte ; la puissance en cas d'égalité
-function classementFinal(){
-  return S.nations.filter(n => tuilesDe(n).length > 0)
-    .map(n => ({n, prov: tuilesDe(n).length, force: puissance(n)}))
-    .sort((a,b) => (b.prov - a.prov) || (b.force - a.force));
-}
-
-function finDuTemps(){
-  S.paused = true; majVitesse();
-  const cl = classementFinal();
-  const moi = cl.findIndex(x => x.n.joueur) + 1;
-  const gagnant = cl[0];
-  const lignes = cl.slice(0, 5).map((x, i) =>
-    `${i+1}. ${x.n.joueur ? '<b>' + x.n.nom + ' (toi)</b>' : x.n.nom} — `
-    + `${x.prov} province${x.prov>1?'s':''}, puissance ${x.force.toFixed(0)}`).join('<br>');
-  const titre = gagnant && gagnant.n.joueur ? 'Victoire' : `${moi}ᵉ sur ${cl.length}`;
-  modal(`Cinq ans ont passé — ${titre}`,
-    (gagnant && gagnant.n.joueur
-      ? 'Ton royaume est le plus grand du monde connu.'
-      : `${gagnant ? gagnant.n.nom : 'Personne'} l'emporte avec ${gagnant ? gagnant.prov : 0} provinces.`)
-    + '<br><br>' + lignes);
-  logue(`${ic('monde')} <b>Fin de la partie courte.</b> ${titre}.`, gagnant && gagnant.n.joueur ? 'good' : 'bad');
-  if(typeof SON !== 'undefined'){
-    if(gagnant && gagnant.n.joueur){ SON.jouer('victoire'); SON.direUn(PHRASES.victoire, true); }
-    else if(moi <= 3){ SON.jouer('reussi'); SON.dire(`Bravo, tu finis ${moi === 2 ? 'deuxième' : 'troisième'} !`, true); }
-    else { SON.jouer('defaite'); SON.dire('Partie terminée. Tu feras mieux la prochaine fois !', true); }
-  }
-  if(typeof SDK !== 'undefined') SDK.partieFin();
-}
+// la fin de l'horloge et les victoires anticipées vivent dans victoire.js
 
 /* ===========================================================
    INTERFACE
@@ -864,7 +907,7 @@ function majBarre(){
       + `${ic('guerre')} Tête mise à prix · ${primeReste()} mois</span>` : '';
   const reste = S.finMois ? Math.max(0, S.finMois - S.mois) : 0;
   const horloge = S.finMois
-    ? `<span class="tag ${reste<=12?'war':''}" title="Partie courte : à la fin, le plus grand royaume l'emporte">`
+    ? `<span class="tag ${reste<=12?'war':''}" title="À la fin de l'horloge, le meilleur score de civilisation l'emporte (onglet Pays)">`
       + `${ic('temps')} ${reste} mois</span>` : '';
   document.getElementById('resBar').innerHTML = horloge + prime + `
     <span title="Trésor national">${ic('or')} <b>${fmt(p.or)}</b> ${d(b.net)}</span>
@@ -1039,7 +1082,8 @@ function panPays(){
     <p class="muted">${p.bonheur<30?'⚠️ Le peuple gronde. Baisse les impôts ou nourris-le.':'La population est satisfaite.'}</p>
     <h3 style="margin-top:14px">Taux d'imposition : ${(p.taxe*100).toFixed(0)}%</h3>
     <input class="slider" type="range" min="0" max="80" value="${p.taxe*100}" id="sTaxe" ${bridePause('impot')}>
-    <p class="muted">Des impôts élevés remplissent les caisses mais font chuter le bonheur.</p>`;
+    <p class="muted">Des impôts élevés remplissent les caisses mais font chuter le bonheur.</p>
+    ${typeof htmlVictoires === 'function' ? htmlVictoires() : ''}`;
   document.getElementById('sTaxe').oninput = e => {
     if(!actionPermise('impot')) return refuserPause();
     p.taxe = e.target.value/100; majUI(); };
@@ -1521,6 +1565,7 @@ function choisirMode(cle){
   accueilEl('sAdv').value    = m.adversaires;
   accueilEl('sIles').value   = m.iles;
   accueilEl('sTaille').value = m.taille;
+  accueilEl('champDuree').classList.toggle('hidden', !m.reglable);
   document.querySelectorAll('.accmode').forEach(b =>
     b.classList.toggle('actif', b.dataset.mode === cle));
   majApercu();
@@ -1530,6 +1575,7 @@ function lireReglages(){
   CONFIG.adversaires = clamp(nombreSur(accueilEl('sAdv').value,    6), 1, MAX_ADVERSAIRES);
   CONFIG.iles        = clamp(nombreSur(accueilEl('sIles').value,   6), 1, MAX_ILES);
   CONFIG.taille      = Math.round(clamp(nombreSur(accueilEl('sTaille').value, 2), 0, TAILLES.length-1));
+  CONFIG.annees      = Math.round(clamp(nombreSur(accueilEl('sDuree').value, 30), ANNEES_MIN, ANNEES_MAX));
 }
 
 function majApercu(){
@@ -1539,14 +1585,18 @@ function majApercu(){
   accueilEl('vAdv').textContent    = CONFIG.adversaires;
   accueilEl('vIles').textContent   = CONFIG.iles;
   accueilEl('vTaille').textContent = TAILLES[CONFIG.taille].nom;
+  accueilEl('vDuree').textContent  = `${CONFIG.annees} ans`;
 
   const m = MODES[CONFIG.mode] || MODES.longue;
   const l = [];
-  l.push(m.duree
-    ? `<b>${m.objectif}</b> ${m.duree} mois de jeu, `
-      + `soit environ ${Math.round(m.duree * m.ms / 60000)} minutes en vitesse normale — `
-      + `plus le temps que tu prends à décider.`
-    : `<b>${m.objectif}</b> Aucune horloge : la partie s'arrête quand tu règnes seul, ou quand tu tombes.`);
+  const mois = dureeMois();
+  l.push(mois
+    ? `<b>${m.objectif}</b> ${mois/12} ans, soit ${mois} mois de jeu : environ `
+      + `${Math.round(mois * m.ms / 60000)} minutes en vitesse normale, moins en accéléré. `
+      + `À la fin, le meilleur <b>score de civilisation</b> l'emporte.`
+    : `<b>${m.objectif}</b> Aucune horloge : la partie s'arrête sur une victoire, ou quand tu tombes.`);
+  l.push(`<b>Cinq victoires anticipées</b>, pour toi comme pour l'IA : domination, savoir, richesse, `
+       + `diplomatie, âge d'or.`);
   l.push(`Un monde d'environ <b>${cases}</b> cases, dont à peu près `
        + `<b>${p.terre}</b> de terre ferme, pour <b>${p.nations}</b> nations.`);
   if(p.agrandi)
@@ -1570,7 +1620,7 @@ function ouvrirAccueil(){
 }
 function fermerAccueil(){ accueilEl('accueil').classList.add('hidden'); }
 
-['sAdv','sIles','sTaille'].forEach(id => accueilEl(id).oninput = majApercu);
+['sAdv','sIles','sTaille','sDuree'].forEach(id => accueilEl(id).oninput = majApercu);
 // les touches du jeu ne doivent pas agir pendant qu'on règle les curseurs
 accueilEl('accueil').addEventListener('keydown', e => e.stopPropagation());
 
@@ -1739,12 +1789,12 @@ function sauvegarder(auto){
         croyances:n.croyances ? {...n.croyances} : null, negociation:n.negociation || null,
         confirmation:n.confirmation || null, menaceEnCours:n.menaceEnCours || null,
         allianceJusqu:n.allianceJusqu || null, allianceDebut:n.allianceDebut || null,
-        chocCapitale:n.chocCapitale || null,
+        chocCapitale:n.chocCapitale || null, ageOr:n.ageOr || 0, alertesVictoire:n.alertesVictoire || null,
         ancienneCapitale: n.ancienneCapitale ? key(n.ancienneCapitale.q, n.ancienneCapitale.r) : null,
         capitale: n.capitale ? key(n.capitale.q, n.capitale.r) : null,
       })),
       conseil: S.conseil ? {chat:S.conseil.chat.slice(-30)} : null,
-      prime: S.prime || null, finMois: S.finMois || 0, mode: CONFIG.mode,
+      prime: S.prime || null, finMois: S.finMois || 0, mode: CONFIG.mode, victoire: S.victoire || null,
       log: S.log.slice(-150),
       tiles: [...S.tiles.values()].map(t=>({
         q:t.q, r:t.r, terr:t.terr, owner:t.owner, pop:+t.pop.toFixed(2),
@@ -1797,6 +1847,7 @@ function appliquerSauvegarde(d){
   S.log = Array.isArray(d.log) ? d.log : [];
   S.prime = d.prime || null;
   S.finMois = d.finMois || 0;
+  S.victoire = d.victoire || null;
   if(d.mode && MODES[d.mode]){ CONFIG.mode = d.mode; MS_PAR_MOIS = MODES[d.mode].ms; }
   S.conseil = {chat:(d.conseil && d.conseil.chat) || [], nonLus:0, proposition:null};
 }
@@ -1812,7 +1863,8 @@ function nouvellePartie(){
     S.chatOuvert = null; oublierRendu(); S.prime = null;
     const m = MODES[CONFIG.mode] || MODES.longue;
     MS_PAR_MOIS = m.ms;
-    S.finMois = m.duree || 0;
+    S.finMois = dureeMois();
+    S.victoire = null;
     demarrer();
     document.getElementById('chargement').classList.add('hidden');
     const fin = ()=>{
@@ -1821,7 +1873,7 @@ function nouvellePartie(){
           + `${TAILLES[CONFIG.taille].nom}. Ton pays est né. <kbd>Espace</kbd> pause · `
           + `<kbd>molette</kbd> zoom · <kbd>flèches</kbd> déplacer · <kbd>C</kbd> capitale · `
           + `<kbd>F</kbd> vue d'ensemble · <kbd>H</kbd> règles.`,'good');
-      if(typeof tutoProposer === 'function') setTimeout(tutoProposer, 900);
+      if(typeof tutoProposer === 'function') tutoProposer(true);   // dès la fin du dézoom
     };
     // l'introduction raconte l'arrivée, puis recule jusqu'à la carte
     if(typeof jouerIntro === 'function') jouerIntro(fin); else fin();
@@ -1849,9 +1901,20 @@ function texteAide(){
   quand tu veux avec <kbd>Espace</kbd>.</p>
 
   <h2>${ic('monde')} But du jeu</h2>
-  <p>Faire prospérer ton pays et survivre. Tu <b>gagnes</b> si tu es la dernière nation debout,
-  tu <b>perds</b> si tu perds toutes tes provinces. Entre les deux, tu joues comme tu veux :
-  marchand pacifique, puissance scientifique ou conquérant.</p>
+  <p>Faire prospérer ton pays et survivre. Tu <b>perds</b> si tu perds toutes tes provinces — ou si une IA
+  remporte une victoire avant toi, car les adversaires jouent avec les mêmes règles que toi.</p>
+  <p>Cinq <b>victoires anticipées</b> sont ouvertes à tous, et ta progression s'affiche dans l'onglet Pays :</p>
+  <ul>
+    <li><b>Domination</b> — tenir la moitié des terres du monde.</li>
+    <li><b>Savoir</b> — découvrir toutes les technologies.</li>
+    <li><b>Richesse</b> — amasser 15 000 or.</li>
+    <li><b>Diplomatie</b> — être l'allié de la moitié des nations encore debout, sans aucune guerre.</li>
+    <li><b>Âge d'or</b> — 24 mois d'affilée avec 150k habitants et un bonheur d'au moins 78.</li>
+  </ul>
+  <p>Être la dernière nation debout reste une victoire totale. Dans une partie à durée limitée (courte :
+  15 ans ; personnalisée : 5 à 100 ans), si personne n'a gagné avant la fin, le <b>score de civilisation</b>
+  départage les nations : six domaines notés sur 100 — territoire, économie, savoir, puissance, prospérité,
+  diplomatie — où la meilleure nation de chaque domaine fait 100.</p>
 
   <h2>${ic('or')} Ressources</h2>
   <div class="grille">

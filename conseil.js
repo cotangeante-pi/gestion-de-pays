@@ -8,8 +8,8 @@ const CONSEIL = {id:-1, nom:'Conseil de la Couronne', col:'#7ee0d0', conseil:tru
 
 /* ---------- prix fictifs : ce que vaut une unité de chaque
      ressource compte tenu de la situation du moment ---------- */
-function valeurs(){
-  const p = S.player, b = bilan(p);
+function valeurs(p = S.player){
+  const b = bilan(p);
   const v = {
     nourriture: 1, or: 1, materiaux: 0.6, energie: 0.8, recherche: 0.9, bonheur: 1.2, defense: 0.7,
   };
@@ -130,8 +130,8 @@ function projeterEtat(mois = 12){
 }
 
 /* ---------- placement : la meilleure province pour un bâtiment ---------- */
-function meilleurEmplacement(type){
-  const p = S.player, B = BUILDINGS[type], out = [];
+function meilleurEmplacement(type, p = S.player){
+  const B = BUILDINGS[type], out = [];
   for(const t of tuilesDe(p)){
     if(!placeLibre(t)) continue;
     if(B.cote && t.terr !== 'cote') continue;
@@ -173,15 +173,15 @@ function meilleurEmplacement(type){
 }
 
 /* ---------- le catalogue d'actions possibles, chiffrées ---------- */
-function actionsPossibles(){
-  const p = S.player, b = bilan(p), v = valeurs(), out = [];
+function actionsPossibles(p = S.player){
+  const b = bilan(p), v = valeurs(p), out = [];
   const gain = d => (d.nourriture||0)*v.nourriture + (d.or||0)*v.or + (d.materiaux||0)*v.materiaux
                   + (d.energie||0)*v.energie + (d.recherche||0)*v.recherche + (d.bonheur||0)*v.bonheur;
 
   // --- bâtiments ---
   for(const [k, B] of Object.entries(BUILDINGS)){
     if(B.tech && !aTech(p, B.tech)) continue;
-    const place = meilleurEmplacement(k);
+    const place = meilleurEmplacement(k, p);
     if(!place) continue;
     const d = {};
     for(const [q, x] of Object.entries(B.eff)){
@@ -231,7 +231,7 @@ function actionsPossibles(){
   }
 
   // --- armée ---
-  const menaceMax = menacePrincipale();
+  const menaceMax = menacePrincipale(p);
   if(menaceMax){
     for(const k of CLES_UNITES){
       if(!uniteDispo(p, k)) continue;
@@ -272,10 +272,10 @@ function nomTuile(t){
 }
 
 /* ---------- qui te menace le plus ---------- */
-function menacePrincipale(){
-  const p = S.player, out = [];
+function menacePrincipale(p = S.player){
+  const out = [];
   for(const o of S.nations){
-    if(o.joueur || tuilesDe(o).length === 0) continue;
+    if(o === p || tuilesDe(o).length === 0) continue;
     const ratio = ratioForce(o, p);
     let g = ratio * (p.guerre.has(o.id) ? 2.2 : 1) * (frontiereCommune(p, o) ? 1.5 : 0.6);
     if(p.allies.has(o.id)) g *= 0.25;
@@ -325,9 +325,9 @@ function planDeGuerre(ennemi){
 // le Conseil ne contourne pas la pause : sinon il suffirait de lui donner
 // les ordres que l'interface refuse
 const ORDRES_EN_PAUSE = {recruter:1};
-function executer(a){
-  const p = S.player;
-  if(S.paused && !ORDRES_EN_PAUSE[a.type])
+// p : la nation qui agit — le joueur par défaut, ou une IA qui joue avec les mêmes règles
+function executer(a, p = S.player){
+  if(p.joueur && S.paused && !ORDRES_EN_PAUSE[a.type])
     return {ok:false, txt:`le temps est arrêté — relance la partie et je m'en charge aussitôt`};
   switch(a.type){
     case 'batir': {
